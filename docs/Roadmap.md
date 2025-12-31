@@ -1,4 +1,4 @@
-ROADMAP COMPLETO — COMENTARAM (MVP)
+# ROADMAP COMPLETO — COMENTARAM (MVP)
 VISÃO GERAL
 
 Objetivo do MVP:
@@ -9,7 +9,7 @@ Criar um app mobile que responda rapidamente à pergunta
 Critério de sucesso:
 Você abrir o app espontaneamente, mais de uma vez por dia, só para olhar.
 
-FASE 0 — CONGELAMENTO DO PRODUTO (JÁ CONCLUÍDA)
+## FASE 0 — CONGELAMENTO DO PRODUTO (JÁ CONCLUÍDA)
 
 📌 Nada muda depois daqui.
 
@@ -27,7 +27,7 @@ Bolhas vivas + explicação causal mínima
 
 👉 Status: ✅ Concluída
 
-FASE 1 — MODELO CONCEITUAL E CONTRATOS
+## FASE 1 — MODELO CONCEITUAL E CONTRATOS
 
 🎯 Garantir que tudo tenha regra clara antes de código.
 
@@ -55,7 +55,7 @@ Nenhuma decisão “em aberto”
 
 👉 Status: ✅ Concluída
 
-FASE 2 — MODELO DE DADOS (MÍNIMO)
+## FASE 2 — MODELO DE DADOS (MÍNIMO)
 
 🎯 Criar a base para o app existir, mesmo com dados fake.
 
@@ -95,7 +95,7 @@ Fácil de simular dados
 
 Fácil de evoluir depois
 
-FASE 3 — SIMULAÇÃO DE VIDA (DADOS FAKE)
+## FASE 3 — SIMULAÇÃO DE VIDA (DADOS FAKE)
 
 🎯 Fazer o app “respirar” antes de qualquer API real.
 
@@ -129,7 +129,7 @@ Bolhas mudam ao longo do tempo
 
 Pelo menos uma bolha “chama atenção” sempre
 
-FASE 4 — APP MOBILE MÍNIMO
+## FASE 4 — APP MOBILE MÍNIMO
 
 🎯 Colocar o Comentaram na sua mão.
 
@@ -163,7 +163,7 @@ Visual limpo
 
 Sensação de instrumento
 
-FASE 5 — EXPERIÊNCIA DO USUÁRIO (HÁBITO)
+## FASE 5 — EXPERIÊNCIA DO USUÁRIO (HÁBITO)
 
 🎯 Usar o app como usuário, não como criador.
 
@@ -190,7 +190,7 @@ visual
 clareza
 Nunca de features.
 
-FASE 6 — PRIMEIRA ABERTURA PÚBLICA (FECHADA)
+## FASE 6 — PRIMEIRA ABERTURA PÚBLICA (FECHADA)
 
 🎯 Validação real, sem pressão.
 
@@ -212,7 +212,7 @@ Entendimento imediato
 
 Curiosidade espontânea
 
-FASE 7 — DECISÃO DE CONTINUIDADE
+## FASE 7 — DECISÃO DE CONTINUIDADE
 
 🎯 Aqui você decide o futuro, com dados reais.
 
