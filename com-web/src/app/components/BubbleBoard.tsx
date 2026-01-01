@@ -2,111 +2,148 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import TrendTape from "@/app/components/TrendTape";
+import { useEffect, useRef, useState } from "react";
 
-type Topic = {
+type Particle = {
   id: string;
-  label: string;
-  energy: number; // 0..1 (tamanho)
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  durMs: number;
+  size: number;
+  color: string;
+  opacity: number;
 };
 
-const TOPICS: Topic[] = [
-  { id: "flamengo", label: "Flamengo", energy: 0.6 },
-  { id: "palmeiras", label: "Palmeiras", energy: 0.5 },
-  { id: "stf", label: "STF", energy: 0.45 },
-  { id: "presidencia", label: "Presidência", energy: 0.55 },
-  { id: "eleicoes-2026", label: "Eleições 2026", energy: 0.4 },
-];
-
-function clamp01(n: number) {
-  return Math.max(0, Math.min(1, n));
+function rand(min: number, max: number) {
+  return Math.random() * (max - min) + min;
 }
 
-export default function BubbleBoard() {
-  const [topics, setTopics] = useState<Topic[]>(TOPICS);
+export default function BubbleParticles({
+  getSourceRect,
+  direction,
+  colorVar,
+  active,
+}: {
+  getSourceRect: () => DOMRect | null;
+  direction: "up" | "down";
+  colorVar: string; // ex "var(--hot-br)" ou "var(--cool-br)"
+  active: boolean;
+}) {
+  const [particles, setParticles] = useState<Particle[]>([]);
+  const timersRef = useRef<number[]>([]);
+  const carryRef = useRef(0);
 
-  // índice do par atual
-  const [pairIdx, setPairIdx] = useState(0);
-
-  // escolhe 2 tópicos diferentes (um hot e um cool) alternando
-  const pair = useMemo(() => {
-    const hot = topics[pairIdx % topics.length];
-    const cool = topics[(pairIdx + 1) % topics.length];
-    return { hot, cool };
-  }, [pairIdx, topics]);
-
-  // “janela” de efeito: 1.5s (ajustável)
   useEffect(() => {
-    const t = window.setInterval(() => {
-      setPairIdx((i) => i + 1);
-    }, 1500);
-    return () => window.clearInterval(t);
+    return () => {
+      timersRef.current.forEach((t) => window.clearTimeout(t));
+      timersRef.current = [];
+    };
   }, []);
 
-  // durante a janela, hot sobe e cool desce gradualmente
   useEffect(() => {
-    if (!pair.hot || !pair.cool) return;
+    if (!active) return;
 
-    const STEP_MS = 90;
-    const t = window.setInterval(() => {
-      setTopics((prev) =>
-        prev.map((it) => {
-          if (it.id === pair.hot.id) return { ...it, energy: clamp01(it.energy + 0.018) };
-          if (it.id === pair.cool.id) return { ...it, energy: clamp01(it.energy - 0.016) };
-          // os demais relaxam lentamente para um baseline
-          const baseline = 0.48;
-          return { ...it, energy: clamp01(it.energy + (baseline - it.energy) * 0.05) };
-        })
-      );
-    }, STEP_MS);
+    const TICK_MS = 80;
+    const PPS = 16; // intensidade do efeito (pode ajustar)
 
-    return () => window.clearInterval(t);
-  }, [pair.hot?.id, pair.cool?.id]);
+    const interval = window.setInterval(() => {
+      const rect = getSourceRect();
+      if (!rect) return;
 
-  const hotEnergy = pair.hot?.energy ?? 0.6;
-  const coolEnergy = pair.cool?.energy ?? 0.4;
+      carryRef.current += (PPS * TICK_MS) / 1000;
+      let toSpawn = Math.floor(carryRef.current);
+      carryRef.current -= toSpawn;
 
-  const hotScale = 1 + hotEnergy * 0.18;
-  const coolScale = 1 + coolEnergy * 0.18;
+      toSpawn = Math.min(toSpawn, 4);
+
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+
+      const newOnes: Particle[] = [];
+
+      for (let i = 0; i < toSpawn; i++) {
+        const size = rand(6, 10);
+        const durMs = Math.round(rand(700, 1200));
+
+        const x0 = cx + rand(-rect.width * 0.25, rect.width * 0.25);
+        const y0 = cy + rand(-rect.height * 0.15, rect.height * 0.15);
+
+        // sobe ou desce ~120px a 200px
+        const dy = direction === "up" ? -rand(120, 200) : rand(120, 200);
+        const x1 = x0 + rand(-18, 18);
+        const y1 = y0 + dy;
+
+        const p: Particle = {
+          id: crypto.randomUUID(),
+          x0,
+          y0,
+          x1,
+          y1,
+          durMs,
+          size,
+          color: colorVar,
+          opacity: rand(0.35, 0.85),
+        };
+
+        newOnes.push(p);
+
+        const removeT = window.setTimeout(() => {
+          setParticles((prev) => prev.filter((it) => it.id !== p.id));
+        }, durMs + 60);
+        timersRef.current.push(removeT);
+      }
+
+      setParticles((prev) => {
+        const merged = prev.concat(newOnes);
+        return merged.length <= 90 ? merged : merged.slice(merged.length - 90);
+      });
+    }, TICK_MS);
+
+    return () => window.clearInterval(interval);
+  }, [active, direction, colorVar, getSourceRect]);
 
   return (
-    <section className="px-5 py-6">
-      <div className="space-y-5">
-        {/* HOT ROW */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div
-              className="bubble bubble-hot w-28 h-28 rounded-full border flex flex-col items-center justify-center overflow-hidden"
-              style={{ transform: `scale(${hotScale})` }}
-            >
-              <div className="font-semibold text-sm px-2 text-center leading-tight">
-                {pair.hot?.label ?? "—"}
-              </div>
-              <div className="text-[10px] text-gray-600 mt-1">Aquecendo</div>
-            </div>
-          </div>
+    <div className="pointer-events-none fixed inset-0 z-[55]" aria-hidden="true">
+      {particles.map((p) => (
+        <span
+          key={p.id}
+          style={
+            {
+              position: "absolute",
+              left: 0,
+              top: 0,
+              width: p.size,
+              height: p.size,
+              borderRadius: 999,
+              background: `color-mix(in srgb, ${p.color} 35%, white)`,
+              border: `1px solid color-mix(in srgb, ${p.color} 55%, transparent)`,
+              opacity: p.opacity,
+              transform: `translate(${p.x0}px, ${p.y0}px)`,
+              animation: `bubbleParticleMove ${p.durMs}ms ease-out forwards`,
+              ["--x1" as any]: `${p.x1}px`,
+              ["--y1" as any]: `${p.y1}px`,
+            } as React.CSSProperties
+          }
+        />
+      ))}
 
-          <TrendTape direction="up" color="var(--hot-tx)" intensity={1.2} />
-        </div>
-
-        {/* COOL ROW */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div
-              className="bubble bubble-cool w-28 h-28 rounded-full border flex flex-col items-center justify-center overflow-hidden"
-              style={{ transform: `scale(${coolScale})` }}
-            >
-              <div className="font-semibold text-sm px-2 text-center leading-tight">
-                {pair.cool?.label ?? "—"}
-              </div>
-              <div className="text-[10px] text-gray-600 mt-1">Esfriando</div>
-            </div>
-          </div>
-
-          <TrendTape direction="down" color="var(--cool-tx)" intensity={1.0} />
-        </div>
-      </div>
-    </section>
+      <style jsx>{`
+        @keyframes bubbleParticleMove {
+          from {
+            transform: translate(var(--x0, 0px), var(--y0, 0px));
+            opacity: 0;
+          }
+          15% {
+            opacity: 0.9;
+          }
+          to {
+            transform: translate(var(--x1), var(--y1));
+            opacity: 0;
+          }
+        }
+      `}</style>
+    </div>
   );
 }
