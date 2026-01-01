@@ -36,6 +36,42 @@ body {
   }
 }
 
+/* Comentaram — tokens de cor (MVP) */
+:root {
+  --hot-bg: #fff7ed;    /* laranja bem claro */
+  --hot-br: #fb923c;    /* laranja */
+  --hot-tx: #9a3412;    /* laranja escuro */
+
+  --steady-bg: #f8fafc; /* cinza frio claro */
+  --steady-br: #cbd5e1; /* cinza */
+  --steady-tx: #334155; /* slate */
+
+  --cool-bg: #eff6ff;   /* azul bem claro */
+  --cool-br: #60a5fa;   /* azul */
+  --cool-tx: #1e3a8a;   /* azul escuro */
+}
+
+/* Classes utilitárias para bolhas por estado */
+.bubble-hot {
+  background: var(--hot-bg);
+  border-color: var(--hot-br);
+  color: var(--hot-tx);
+}
+
+.bubble-steady {
+  background: var(--steady-bg);
+  border-color: var(--steady-br);
+  color: var(--steady-tx);
+}
+
+.bubble-cool {
+  background: var(--cool-bg);
+  border-color: var(--cool-br);
+  color: var(--cool-tx);
+  opacity: 0.9;
+}
+
+
 .animate-pulseSoft {
   animation: pulseSoft 3s ease-in-out infinite;
 }
