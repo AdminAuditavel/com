@@ -11,12 +11,12 @@ type Bubble = {
   label: string;
   state: "hot" | "steady" | "cool";
   size: "lg" | "md" | "sm";
-  energy: number;
+  energy: number; // 0..1
   trend: -1 | 0 | 1;
 };
 
 type CategoryBlock = {
-  title: "ESPORTES" | "POLÍTICA";
+  title: string;
   items: Bubble[];
 };
 
@@ -24,55 +24,26 @@ const INITIAL_DATA: CategoryBlock[] = [
   {
     title: "ESPORTES",
     items: [
-      { id: "flamengo", label: "Flamengo", state: "hot", size: "lg", energy: 0.82, trend: 1 },
-      { id: "palmeiras", label: "Palmeiras", state: "hot", size: "md", energy: 0.68, trend: 1 },
-      { id: "corinthians", label: "Corinthians", state: "steady", size: "md", energy: 0.52, trend: 0 },
-      { id: "selecao", label: "Seleção Brasileira", state: "steady", size: "sm", energy: 0.46, trend: 0 },
-      { id: "ufc", label: "UFC", state: "steady", size: "sm", energy: 0.48, trend: 0 },
-      { id: "mcgregor", label: "McGregor", state: "cool", size: "sm", energy: 0.2, trend: -1 },
-      { id: "futebol-mundial", label: "Futebol Mundial", state: "hot", size: "md", energy: 0.62, trend: 1 },
+      { id: "flamengo", label: "Flamengo", state: "hot", size: "lg", energy: 0.9, trend: 1 },
+      { id: "palmeiras", label: "Palmeiras", state: "hot", size: "md", energy: 0.78, trend: 1 },
+      { id: "corinthians", label: "Corinthians", state: "steady", size: "md", energy: 0.58, trend: 0 },
+      { id: "selecao", label: "Seleção Brasileira", state: "steady", size: "sm", energy: 0.5, trend: 0 },
+      { id: "ufc", label: "UFC", state: "steady", size: "sm", energy: 0.52, trend: 0 },
+      { id: "mcgregor", label: "McGregor", state: "cool", size: "sm", energy: 0.22, trend: -1 },
+      { id: "futebol-mundial", label: "Futebol Mundial", state: "hot", size: "md", energy: 0.75, trend: 1 },
     ],
   },
   {
     title: "POLÍTICA",
     items: [
-      { id: "presidencia", label: "Presidência", state: "hot", size: "md", energy: 0.72, trend: 1 },
-      { id: "congresso", label: "Congresso", state: "steady", size: "sm", energy: 0.5, trend: 0 },
-      { id: "stf", label: "STF", state: "hot", size: "sm", energy: 0.58, trend: 1 },
-      { id: "eleicoes-2026", label: "Eleições 2026", state: "steady", size: "sm", energy: 0.52, trend: 0 },
-      { id: "gastos-publicos", label: "Gastos Públicos", state: "steady", size: "sm", energy: 0.44, trend: -1 },
+      { id: "presidencia", label: "Presidência", state: "hot", size: "md", energy: 0.82, trend: 1 },
+      { id: "congresso", label: "Congresso", state: "steady", size: "sm", energy: 0.55, trend: 0 },
+      { id: "stf", label: "STF", state: "hot", size: "sm", energy: 0.7, trend: 1 },
+      { id: "eleicoes-2026", label: "Eleições 2026", state: "steady", size: "sm", energy: 0.6, trend: 0 },
+      { id: "gastos-publicos", label: "Gastos Públicos", state: "steady", size: "sm", energy: 0.48, trend: -1 },
     ],
   },
 ];
-
-type BubblePos = { x: number; y: number }; // percent
-
-const POSITIONS: Record<CategoryBlock["title"], Record<string, BubblePos>> = {
-  ESPORTES: {
-    flamengo: { x: 58, y: 42 },
-    palmeiras: { x: 34, y: 34 },
-    corinthians: { x: 40, y: 60 },
-    selecao: { x: 28, y: 72 },
-    ufc: { x: 72, y: 58 },
-    mcgregor: { x: 60, y: 72 },
-    "futebol-mundial": { x: 48, y: 74 },
-  },
-  POLÍTICA: {
-    presidencia: { x: 56, y: 44 },
-    stf: { x: 34, y: 46 },
-    congresso: { x: 72, y: 52 },
-    "eleicoes-2026": { x: 44, y: 70 },
-    "gastos-publicos": { x: 60, y: 74 },
-  },
-};
-
-function clamp01(n: number) {
-  return Math.max(0, Math.min(1, n));
-}
-
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
 
 function stateLabel(s: Bubble["state"]) {
   if (s === "hot") return "Aquecendo";
@@ -86,9 +57,14 @@ function sizeClasses(size: Bubble["size"]) {
   return "w-22 h-22 text-xs";
 }
 
+function clamp01(n: number) {
+  return Math.max(0, Math.min(1, n));
+}
+
 export default function BubbleBoard() {
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
 
+  // pager / categoria ativa
   const [activeIndex, setActiveIndex] = useState(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
@@ -108,7 +84,7 @@ export default function BubbleBoard() {
     if (idx !== activeIndex) setActiveIndex(idx);
   }, [activeIndex]);
 
-  // refs para DOMRect (agora no botão-anchor)
+  // refs para DOMRect
   const bubbleElsRef = useRef(new Map<string, HTMLButtonElement | null>());
   const setBubbleEl = useCallback((id: string) => {
     return (el: HTMLButtonElement | null) => {
@@ -136,21 +112,18 @@ export default function BubbleBoard() {
 
   const activeCat = data[activeIndex];
 
-  const hotTargets = useMemo(() => {
+  // apenas targets da categoria ativa
+  const activeHotIds = useMemo(() => {
     if (!activeCat) return [];
-    return activeCat.items
-      .filter((b) => b.state === "hot")
-      .map((b) => ({ id: b.id, weight: Math.max(0.05, b.energy ** 2) }));
+    return activeCat.items.filter((b) => b.state === "hot").map((b) => b.id);
   }, [activeCat]);
 
-  const coolTargets = useMemo(() => {
+  const activeCoolIds = useMemo(() => {
     if (!activeCat) return [];
-    return activeCat.items
-      .filter((b) => b.state === "cool")
-      .map((b) => ({ id: b.id, weight: Math.max(0.05, b.energy ** 1.4) }));
+    return activeCat.items.filter((b) => b.state === "cool").map((b) => b.id);
   }, [activeCat]);
 
-  // origins
+  // origins A/B
   const [origins, setOrigins] = useState(() => ({
     originA: { x: -40, y: 900 },
     originB: { x: 900, y: -40 },
@@ -168,62 +141,50 @@ export default function BubbleBoard() {
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  const onImpact = useCallback((id: string, delta: number) => {
-    setData((prev) =>
-      prev.map((cat) => ({
-        ...cat,
-        items: cat.items.map((b) => {
-          if (b.id !== id) return b;
-          const nextEnergy = clamp01(b.energy + delta);
-          const trend: Bubble["trend"] = delta > 0 ? 1 : delta < 0 ? -1 : 0;
-          return { ...b, energy: nextEnergy, trend };
-        }),
-      }))
-    );
-  }, []);
-
-  // decay
-  useEffect(() => {
-    const t = window.setInterval(() => {
-      setData((prev) =>
-        prev.map((cat) => ({
-          ...cat,
-          items: cat.items.map((b) => {
-            const baseline = b.state === "hot" ? 0.7 : b.state === "steady" ? 0.5 : 0.25;
-            return { ...b, energy: clamp01(b.energy + (baseline - b.energy) * 0.05) };
-          }),
-        }))
-      );
-    }, 250);
-    return () => window.clearInterval(t);
-  }, []);
-
-  // simulação de estado
+  // Simulação contínua (mantém vida). Se você já tem onImpact no FlowLayer, pode remover depois.
   const allIds = useMemo(() => data.flatMap((c) => c.items.map((b) => b.id)), [data]);
+
   useEffect(() => {
     const t = window.setInterval(() => {
       const pick = allIds[Math.floor(Math.random() * allIds.length)];
       if (!pick) return;
+
       setData((prev) =>
         prev.map((cat) => ({
           ...cat,
           items: cat.items.map((b) => {
             if (b.id !== pick) return b;
+
             const nextState: Bubble["state"] =
               b.state === "cool" ? "steady" : b.state === "steady" ? "hot" : "cool";
-            return { ...b, state: nextState };
+
+            const trend: Bubble["trend"] =
+              nextState === "hot" ? 1 : nextState === "cool" ? -1 : 0;
+
+            const baseTarget =
+              nextState === "hot" ? 0.85 : nextState === "steady" ? 0.58 : 0.25;
+            const target = clamp01(baseTarget + (Math.random() * 0.12 - 0.06));
+            const nextEnergy = clamp01(b.energy + (target - b.energy) * 0.55);
+
+            const nextSize: Bubble["size"] =
+              nextState === "hot" && nextEnergy > 0.78
+                ? b.size === "sm"
+                  ? "md"
+                  : "lg"
+                : nextState === "cool" && nextEnergy < 0.32
+                  ? b.size === "lg"
+                    ? "md"
+                    : "sm"
+                  : b.size;
+
+            return { ...b, state: nextState, size: nextSize, energy: nextEnergy, trend };
           }),
         }))
       );
-    }, 5200);
+    }, 2200);
+
     return () => window.clearInterval(t);
   }, [allIds]);
-
-  // Área segura (centros)
-  const SAFE_X_MIN = 16;
-  const SAFE_X_MAX = 84;
-  const SAFE_Y_MIN = 18;
-  const SAFE_Y_MAX = 82;
 
   return (
     <>
@@ -231,12 +192,11 @@ export default function BubbleBoard() {
         originA={origins.originA}
         originB={origins.originB}
         getTargetRectById={getTargetRectById}
-        hotTargets={hotTargets}
-        coolTargets={coolTargets}
-        onImpact={onImpact}
+        hotIds={activeHotIds}
+        coolIds={activeCoolIds}
       />
 
-      {/* Tabs */}
+      {/* Tabs (sem mensagem extra) */}
       <div className="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-gray-100">
         <div className="px-5 py-3">
           <div className="flex gap-2">
@@ -254,6 +214,7 @@ export default function BubbleBoard() {
                       ? "bg-gray-900 text-white border-gray-900"
                       : "bg-white text-gray-600 border-gray-200",
                   ].join(" ")}
+                  aria-current={active ? "page" : undefined}
                 >
                   {cat.title}
                 </button>
@@ -285,69 +246,49 @@ export default function BubbleBoard() {
           {data.map((cat) => (
             <section
               key={cat.title}
-              className="w-full flex-none snap-center px-5"
-              style={{ height: "calc(100dvh - 72px)" }}
+              className="w-full flex-none snap-center px-5 pb-10"
+              style={{ minHeight: "calc(100vh - 72px)" }}
             >
-              <div
-                className="relative w-full"
-                style={{
-                  height: "calc(100dvh - 120px)",
-                  // debug se precisar:
-                  // outline: "1px dashed rgba(148,163,184,0.7)",
-                }}
-              >
-                {cat.items.map((b) => {
-                  const raw = POSITIONS[cat.title][b.id] ?? { x: 50, y: 50 };
-                  const x = clamp(raw.x, SAFE_X_MIN, SAFE_X_MAX);
-                  const y = clamp(raw.y, SAFE_Y_MIN, SAFE_Y_MAX);
-
-                  return (
+              {/* Sem “quadrado/card”: só o campo limpo */}
+              <div className="pt-6">
+                <div className="flex flex-wrap gap-3">
+                  {cat.items.map((b) => (
                     <button
                       key={b.id}
                       ref={setBubbleEl(b.id)}
                       type="button"
-                      className="absolute select-none"
-                      style={{
-                        left: `${x}%`,
-                        top: `${y}%`,
-                        transform: "translate(-50%, -50%)",
-                      }}
-                      onClick={() => setSelectedId(b.id)}
+                      className={[
+                        "bubble relative rounded-full border",
+                        "flex flex-col items-center justify-center",
+                        "shadow-sm active:scale-[0.98] transition",
+                        "select-none overflow-hidden",
+                        b.state === "hot" && "bubble-hot",
+                        b.state === "steady" && "bubble-steady",
+                        b.state === "cool" && "bubble-cool",
+                        b.trend === 1 && "bubble-rise",
+                        b.trend === -1 && "bubble-fall",
+                        sizeClasses(b.size),
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      style={
+                        {
+                          ["--e" as any]: b.energy,
+                          ["--t" as any]: b.trend,
+                        } as React.CSSProperties
+                      }
                       aria-label={`${b.label} — ${stateLabel(b.state)}`}
+                      onClick={() => setSelectedId(b.id)}
                     >
-                      {/* O “corpo” da bolha anima transform sem quebrar posicionamento */}
-                      <div
-                        className={[
-                          "bubble rounded-full border",
-                          "flex flex-col items-center justify-center",
-                          "shadow-sm active:scale-[0.98] transition",
-                          "overflow-hidden",
-                          b.state === "hot" && "bubble-hot",
-                          b.state === "steady" && "bubble-steady",
-                          b.state === "cool" && "bubble-cool",
-                          b.trend === 1 && "bubble-rise",
-                          b.trend === -1 && "bubble-fall",
-                          sizeClasses(b.size),
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                        style={
-                          {
-                            ["--e" as any]: b.energy,
-                            ["--t" as any]: b.trend,
-                          } as React.CSSProperties
-                        }
-                      >
-                        <span className="relative z-10 font-medium leading-tight text-center px-2">
-                          {b.label}
-                        </span>
-                        <span className="relative z-10 mt-1 text-[10px] text-gray-600">
-                          {stateLabel(b.state)}
-                        </span>
-                      </div>
+                      <span className="relative z-10 font-medium leading-tight text-center px-2">
+                        {b.label}
+                      </span>
+                      <span className="relative z-10 mt-1 text-[10px] text-gray-600">
+                        {stateLabel(b.state)}
+                      </span>
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
             </section>
           ))}
