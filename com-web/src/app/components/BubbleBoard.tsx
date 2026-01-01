@@ -1,4 +1,5 @@
 // src/app/components/BubbleBoard.tsx
+
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -11,10 +12,10 @@ type Bubble = {
   state: "hot" | "steady" | "cool";
   size: "lg" | "md" | "sm";
 
-  // NOVO: contínuo (0..1) para dar “vida”
+  // contínuo (0..1) para dar “vida”
   energy: number;
 
-  // NOVO: -1 (caindo), 0 (neutro), 1 (subindo)
+  // -1 (caindo), 0 (neutro), 1 (subindo)
   trend: -1 | 0 | 1;
 };
 
@@ -67,6 +68,7 @@ function clamp01(n: number) {
 export default function BubbleBoard() {
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
 
+  // refs dos botões (para saber o DOMRect de cada bolha)
   const bubbleElsRef = useRef(new Map<string, HTMLButtonElement | null>());
 
   const setBubbleEl = useCallback((id: string) => {
@@ -80,6 +82,7 @@ export default function BubbleBoard() {
     return el ? el.getBoundingClientRect() : null;
   }, []);
 
+  // Modal: guarda id e deriva estado atual do data (não “congela”)
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const isOpen = !!selectedId;
 
@@ -92,6 +95,7 @@ export default function BubbleBoard() {
     return null;
   }, [data, selectedId]);
 
+  // ids por estado (para o FlowLayer)
   const hotIds = useMemo(() => {
     return data.flatMap((c) => c.items.filter((b) => b.state === "hot").map((b) => b.id));
   }, [data]);
@@ -100,16 +104,17 @@ export default function BubbleBoard() {
     return data.flatMap((c) => c.items.filter((b) => b.state === "cool").map((b) => b.id));
   }, [data]);
 
+  // pontos fixos (2 “infinitos”): inicializa no client e atualiza em resize
   const [origins, setOrigins] = useState(() => ({
-    originA: { x: -40, y: 900 },
+    originA: { x: -40, y: 900 }, // placeholder, ajusta no effect
     originB: { x: 900, y: -40 },
   }));
 
   useEffect(() => {
     const update = () => {
       setOrigins({
-        originA: { x: -40, y: window.innerHeight + 40 },
-        originB: { x: window.innerWidth + 40, y: -40 },
+        originA: { x: -40, y: window.innerHeight + 40 }, // canto inferior esquerdo “fora”
+        originB: { x: window.innerWidth + 40, y: -40 }, // canto superior direito “fora”
       });
     };
     update();
@@ -119,7 +124,7 @@ export default function BubbleBoard() {
 
   const allIds = useMemo(() => data.flatMap((c) => c.items.map((b) => b.id)), [data]);
 
-  // Simulação: agora altera energia e trend de forma contínua (mais “vivo”)
+  // Simulação do pulso (mais frequente e contínua)
   useEffect(() => {
     const t = window.setInterval(() => {
       const pick = allIds[Math.floor(Math.random() * allIds.length)];
@@ -131,22 +136,23 @@ export default function BubbleBoard() {
           items: cat.items.map((b) => {
             if (b.id !== pick) return b;
 
+            // ciclo: cool -> steady -> hot -> cool
             const nextState: Bubble["state"] =
               b.state === "cool" ? "steady" : b.state === "steady" ? "hot" : "cool";
 
-            // trend baseado na direção da mudança
+            // tendência pela direção da mudança
             const trend: Bubble["trend"] =
               nextState === "hot" ? 1 : nextState === "cool" ? -1 : 0;
 
-            // energia alvo por estado (com leve random para não ficar robótico)
+            // energia alvo por estado (com leve aleatoriedade)
             const baseTarget =
               nextState === "hot" ? 0.85 : nextState === "steady" ? 0.58 : 0.25;
             const target = clamp01(baseTarget + (Math.random() * 0.12 - 0.06));
 
-            // smoothing: aproxima em passos (mais orgânico que “pular”)
+            // aproxima suave (orgânico)
             const nextEnergy = clamp01(b.energy + (target - b.energy) * 0.55);
 
-            // mantém seu size (mas com menos “degrau”: só muda em hot/cool extremos)
+            // tamanho ainda existe, mas com menos “degrau”
             const nextSize: Bubble["size"] =
               nextState === "hot" && nextEnergy > 0.78
                 ? b.size === "sm"
@@ -162,7 +168,7 @@ export default function BubbleBoard() {
           }),
         }))
       );
-    }, 2200); // mais frequente = tela mais “viva”
+    }, 2200);
 
     return () => window.clearInterval(t);
   }, [allIds]);
@@ -186,11 +192,9 @@ export default function BubbleBoard() {
               </h2>
             </div>
 
-            <div className="py-3 border-t border-gray-100">
+            {/* Removido o “card/quadrado” (border + bg) para não parecer preso */}
+            <div className="py-2">
               <div className="flex flex-wrap gap-3">
-                {cat.items.map(...)}
-              </div>
-            </div>
                 {cat.items.map((b) => (
                   <button
                     key={b.id}
@@ -212,7 +216,6 @@ export default function BubbleBoard() {
                       .join(" ")}
                     style={
                       {
-                        // CSS variables (motor de “vida”)
                         ["--e" as any]: b.energy,
                         ["--t" as any]: b.trend,
                       } as React.CSSProperties
