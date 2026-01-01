@@ -84,7 +84,7 @@ const selected = useMemo<TopicDetail | null>(() => {
             if (b.id !== pick) return b;
 
             const nextState: Bubble["state"] =
-              b.state === "cool" ? "steady" : b.state === "steady" ? "hot" : "steady";
+              b.state === "cool" ? "steady" : b.state === "steady" ? "hot" : "cool";
 
             const nextSize: Bubble["size"] =
               nextState === "hot"
