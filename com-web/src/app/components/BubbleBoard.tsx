@@ -72,6 +72,7 @@ function makeSeries(mode: "up" | "down") {
 export default function BubbleBoard() {
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
 
+  // tabs/pager
   const [activeIndex, setActiveIndex] = useState(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
@@ -91,14 +92,16 @@ export default function BubbleBoard() {
     if (idx !== activeIndex) setActiveIndex(idx);
   }, [activeIndex]);
 
+  // modal
   const [selected, setSelected] = useState<TopicDetail | null>(null);
 
+  // refs das bolhas em destaque (para partículas)
   const hotRef = useRef<HTMLButtonElement | null>(null);
   const coolRef = useRef<HTMLButtonElement | null>(null);
 
   const activeCat = data[activeIndex];
 
-  const CHANGE_MS = 3800;
+  const CHANGE_MS = 3800; // velocidade de troca do par
   const [pairTick, setPairTick] = useState(0);
 
   useEffect(() => {
@@ -106,19 +109,20 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, []);
 
-  const { hotBubble, coolBubble, steadyBubble } = useMemo(() => {
+  // escolhe hot/cool (apenas 2)
+  const { hotBubble, coolBubble } = useMemo(() => {
     const items = activeCat?.items ?? [];
-    if (items.length < 3) return { hotBubble: items[0], coolBubble: items[1], steadyBubble: items[2] };
+    if (items.length < 2) return { hotBubble: items[0], coolBubble: items[1] };
 
     return {
       hotBubble: items[pairTick % items.length],
       coolBubble: items[(pairTick + 1) % items.length],
-      steadyBubble: items[(pairTick + 2) % items.length],
     };
   }, [activeCat, pairTick]);
 
+  // atualiza estados/energy (somente hot/cool)
   useEffect(() => {
-    if (!activeCat || !hotBubble || !coolBubble || !steadyBubble) return;
+    if (!activeCat || !hotBubble || !coolBubble) return;
 
     const STEP_MS = 120;
     const t = window.setInterval(() => {
@@ -131,10 +135,7 @@ export default function BubbleBoard() {
             items: cat.items.map((b) => {
               if (b.id === hotBubble.id) return { ...b, state: "hot", energy: clamp01(b.energy + 0.014), size: "md" };
               if (b.id === coolBubble.id) return { ...b, state: "cool", energy: clamp01(b.energy - 0.011), size: "sm" };
-              if (b.id === steadyBubble.id) {
-                const baseline = 0.52;
-                return { ...b, state: "steady", energy: clamp01(b.energy + (baseline - b.energy) * 0.06), size: "sm" };
-              }
+
               const baseline = 0.5;
               return { ...b, state: "steady", energy: clamp01(b.energy + (baseline - b.energy) * 0.03) };
             }),
@@ -144,8 +145,9 @@ export default function BubbleBoard() {
     }, STEP_MS);
 
     return () => window.clearInterval(t);
-  }, [activeCat, activeIndex, hotBubble?.id, coolBubble?.id, steadyBubble?.id]);
+  }, [activeCat, activeIndex, hotBubble?.id, coolBubble?.id]);
 
+  // séries do gráfico (hot/cool)
   const hotSeries = useMemo(() => makeSeries("up"), [pairTick, activeIndex]);
   const coolSeries = useMemo(() => makeSeries("down"), [pairTick, activeIndex]);
 
@@ -157,6 +159,7 @@ export default function BubbleBoard() {
       <BubbleParticles active={!!hotBubble} direction="up" colorVar="var(--hot-br)" getSourceRect={getHotRect} />
       <BubbleParticles active={!!coolBubble} direction="down" colorVar="var(--cool-br)" getSourceRect={getCoolRect} />
 
+      {/* Tabs */}
       <div className="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-gray-100">
         <div className="px-5 py-3">
           <div className="flex gap-2">
@@ -185,6 +188,7 @@ export default function BubbleBoard() {
         </div>
       </div>
 
+      {/* Pager horizontal */}
       <div
         ref={viewportRef}
         onScroll={onScroll}
@@ -204,12 +208,12 @@ export default function BubbleBoard() {
 
             const hot = isActive ? hotBubble : items[0];
             const cool = isActive ? coolBubble : items[1];
-            const steady = isActive ? steadyBubble : items[2];
 
             return (
               <section key={cat.title} className="w-full flex-none snap-center px-5 pb-8" style={{ minHeight: "calc(100dvh - 72px)" }}>
                 <div className="pt-6 flex flex-col gap-5">
-                  <div className="flex justify-center gap-4">
+                  {/* 2 bolhas principais */}
+                  <div className="flex justify-center gap-5">
                     <button
                       ref={isActive ? hotRef : undefined}
                       type="button"
@@ -218,7 +222,7 @@ export default function BubbleBoard() {
                       style={{ ["--e" as any]: hot?.energy ?? 0.6 }}
                     >
                       <div className="font-semibold text-[13px] px-2 text-center leading-tight">{hot?.label ?? "—"}</div>
-                      <div className="text-[10px] text-gray-600 mt-1">Quente</div>
+                      <div className="text-[10px] text-gray-600 mt-1">Aquecendo</div>
                     </button>
 
                     <button
@@ -229,27 +233,19 @@ export default function BubbleBoard() {
                       style={{ ["--e" as any]: cool?.energy ?? 0.4 }}
                     >
                       <div className="font-semibold text-[13px] px-2 text-center leading-tight">{cool?.label ?? "—"}</div>
-                      <div className="text-[10px] text-gray-600 mt-1">Frio</div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => steady && setSelected(asDetail(steady))}
-                      className="bubble bubble-steady rounded-full border overflow-hidden flex flex-col items-center justify-center w-24 h-24"
-                      style={{ ["--e" as any]: steady?.energy ?? 0.5 }}
-                    >
-                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">{steady?.label ?? "—"}</div>
-                      <div className="text-[10px] text-gray-600 mt-1">Estável</div>
+                      <div className="text-[10px] text-gray-600 mt-1">Esfriando</div>
                     </button>
                   </div>
 
+                  {/* Gráfico */}
                   <TrendChart
                     now={new Date()}
                     hot={{ name: hot?.label ?? "Quente", points: hotSeries }}
                     cool={{ name: cool?.label ?? "Frio", points: coolSeries }}
-                    height={180}
+                    height={200}
                   />
 
+                  {/* Todas as bolhas menores */}
                   <div className="pt-1">
                     <div className="flex flex-wrap gap-3 justify-center">
                       {items.map((b) => (
