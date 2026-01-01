@@ -47,23 +47,22 @@ const INITIAL_DATA: CategoryBlock[] = [
 
 type BubblePos = { x: number; y: number }; // percent
 
-// Mais “denso”: cluster central (ainda sem parecer grade)
 const POSITIONS: Record<CategoryBlock["title"], Record<string, BubblePos>> = {
   ESPORTES: {
-    flamengo: { x: 58, y: 38 }, // grande mais central
+    flamengo: { x: 58, y: 40 },
     palmeiras: { x: 36, y: 34 },
-    corinthians: { x: 44, y: 56 },
-    selecao: { x: 32, y: 68 },
-    ufc: { x: 68, y: 58 },
+    corinthians: { x: 42, y: 58 },
+    selecao: { x: 30, y: 70 },
+    ufc: { x: 70, y: 58 },
     mcgregor: { x: 58, y: 72 },
     "futebol-mundial": { x: 46, y: 72 },
   },
   POLÍTICA: {
-    presidencia: { x: 56, y: 40 },
-    stf: { x: 36, y: 44 },
-    congresso: { x: 70, y: 50 },
-    "eleicoes-2026": { x: 44, y: 66 },
-    "gastos-publicos": { x: 60, y: 70 },
+    presidencia: { x: 56, y: 42 },
+    stf: { x: 34, y: 44 },
+    congresso: { x: 72, y: 50 },
+    "eleicoes-2026": { x: 44, y: 68 },
+    "gastos-publicos": { x: 60, y: 72 },
   },
 };
 
@@ -109,7 +108,7 @@ export default function BubbleBoard() {
     if (idx !== activeIndex) setActiveIndex(idx);
   }, [activeIndex]);
 
-  // refs para DOMRect
+  // refs DOMRect
   const bubbleElsRef = useRef(new Map<string, HTMLButtonElement | null>());
   const setBubbleEl = useCallback((id: string) => {
     return (el: HTMLButtonElement | null) => {
@@ -183,6 +182,7 @@ export default function BubbleBoard() {
     );
   }, []);
 
+  // decay
   useEffect(() => {
     const t = window.setInterval(() => {
       setData((prev) =>
@@ -190,8 +190,7 @@ export default function BubbleBoard() {
           ...cat,
           items: cat.items.map((b) => {
             const baseline = b.state === "hot" ? 0.7 : b.state === "steady" ? 0.5 : 0.25;
-            const nextEnergy = clamp01(b.energy + (baseline - b.energy) * 0.05);
-            return { ...b, energy: nextEnergy };
+            return { ...b, energy: clamp01(b.energy + (baseline - b.energy) * 0.05) };
           }),
         }))
       );
@@ -205,7 +204,6 @@ export default function BubbleBoard() {
     const t = window.setInterval(() => {
       const pick = allIds[Math.floor(Math.random() * allIds.length)];
       if (!pick) return;
-
       setData((prev) =>
         prev.map((cat) => ({
           ...cat,
@@ -221,11 +219,11 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, [allIds]);
 
-  // Safe area mais apertada (mais denso)
-  const SAFE_X_MIN = 22;
-  const SAFE_X_MAX = 78;
-  const SAFE_Y_MIN = 20;
-  const SAFE_Y_MAX = 80;
+  // SAFE area (menos restrita, mas ainda evita cortar)
+  const SAFE_X_MIN = 16;
+  const SAFE_X_MAX = 84;
+  const SAFE_Y_MIN = 18;
+  const SAFE_Y_MAX = 82;
 
   return (
     <>
@@ -256,7 +254,6 @@ export default function BubbleBoard() {
                       ? "bg-gray-900 text-white border-gray-900"
                       : "bg-white text-gray-600 border-gray-200",
                   ].join(" ")}
-                  aria-current={active ? "page" : undefined}
                 >
                   {cat.title}
                 </button>
@@ -266,7 +263,7 @@ export default function BubbleBoard() {
         </div>
       </div>
 
-      {/* Pager horizontal */}
+      {/* Pager (horizontal) */}
       <div
         ref={viewportRef}
         onScroll={onScroll}
@@ -289,17 +286,16 @@ export default function BubbleBoard() {
             <section
               key={cat.title}
               className="w-full flex-none snap-center px-5"
-              style={{
-                height: "calc(100vh - 72px)", // uma tela só
-                overflow: "hidden",
-              }}
+              style={{ height: "calc(100dvh - 72px)" }}
             >
-              {/* Campo denso */}
+              {/* Campo: uma tela, denso */}
               <div
                 className="relative w-full"
                 style={{
-                  height: "calc(100vh - 120px)", // tabs + padding
-                  marginTop: 10,
+                  height: "calc(100dvh - 120px)",
+                  overflow: "visible",
+                  // DEBUG (opcional): descomente pra ver a área do campo
+                  // outline: "1px dashed rgba(148,163,184,0.6)",
                 }}
               >
                 {cat.items.map((b) => {
