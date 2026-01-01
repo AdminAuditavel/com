@@ -36,7 +36,7 @@ function yAt(v: number, h: number, pad: number) {
   return pad + (1 - clamp01(v)) * innerH;
 }
 
-function boostedPercent(points: Point[], boost = 1.9) {
+function boostedPercent(points: Point[], boost = 2.2) {
   if (points.length < 2) return 0;
   const first = clamp01(points[0]!.v);
   const last = clamp01(points[points.length - 1]!.v);
@@ -52,7 +52,7 @@ export default function TrendChart({
   hot,
   cool,
   width = 360,
-  height = 190,
+  height = 200,
   now = new Date(),
 }: {
   hot: { name: string; points: Point[] };
@@ -69,53 +69,53 @@ export default function TrendChart({
   const hotLast = hot.points[hot.points.length - 1]?.v ?? 0.5;
   const coolLast = cool.points[cool.points.length - 1]?.v ?? 0.5;
 
-  const hotPct = boostedPercent(hot.points, 1.9);
-  const coolPct = boostedPercent(cool.points, 1.9);
+  const hotY0 = yAt(hotLast, height, pad);
+  const coolY0 = yAt(coolLast, height, pad);
 
-  const hotY = yAt(hotLast, height, pad);
-  const coolY = yAt(coolLast, height, pad);
+  const hotPct = boostedPercent(hot.points, 2.4);
+  const coolPct = boostedPercent(cool.points, 2.4);
 
-  // evitar overlap dos labels
-  const tooClose = Math.abs(hotY - coolY) < 36;
-  const hotDY = tooClose && hotY <= coolY ? -18 : 0;
-  const coolDY = tooClose && coolY < hotY ? 18 : 0;
-
-  // eixo X 4 tempos
+  // Eixo X 4 tempos
   const t15 = new Date(now.getTime() - 15 * 60 * 1000);
   const t10 = new Date(now.getTime() - 10 * 60 * 1000);
   const t5 = new Date(now.getTime() - 5 * 60 * 1000);
   const t0 = now;
 
-  // label box (posição “no final”)
-  const labelW = 118;
-  const labelH = 36;
-  const labelX = width - pad - labelW; // encosta à direita dentro do plot
+  // Label “card” fixo à direita (X), Y segue o ponto final
+  const cardW = 128;
+  const cardH = 38;
+  const cardX = width - pad - cardW; // SEMPRE alinhado à direita
+
+  // Anti-overlap: se ficarem muito próximos, empurra um pra cima e outro pra baixo
+  const tooClose = Math.abs(hotY0 - coolY0) < cardH + 8;
+  let hotY = hotY0;
+  let coolY = coolY0;
+
+  if (tooClose) {
+    if (hotY0 <= coolY0) {
+      hotY = hotY0 - (cardH / 2 + 6);
+      coolY = coolY0 + (cardH / 2 + 6);
+    } else {
+      hotY = hotY0 + (cardH / 2 + 6);
+      coolY = coolY0 - (cardH / 2 + 6);
+    }
+  }
+
+  // Clamp para não sair do gráfico
+  const minY = pad + cardH / 2;
+  const maxY = height - pad - 14 - cardH / 2; // -14 por causa do eixo X embaixo
+  hotY = Math.max(minY, Math.min(maxY, hotY));
+  coolY = Math.max(minY, Math.min(maxY, coolY));
 
   return (
     <div className="w-full">
       <div className="w-full rounded-xl bg-white/70 px-2 py-2">
-        <svg
-          width="100%"
-          height={height}
-          viewBox={`0 0 ${width} ${height}`}
-          preserveAspectRatio="none"
-          aria-label="Gráfico de tendência"
-        >
+        <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
           {/* grid horizontal leve */}
           <g opacity="0.75">
             {[0.2, 0.5, 0.8].map((v) => {
               const y = yAt(v, height, pad);
-              return (
-                <line
-                  key={v}
-                  x1={pad}
-                  y1={y}
-                  x2={width - pad}
-                  y2={y}
-                  stroke="#e5e7eb"
-                  strokeWidth="1"
-                />
-              );
+              return <line key={v} x1={pad} y1={y} x2={width - pad} y2={y} stroke="#e5e7eb" strokeWidth="1" />;
             })}
           </g>
 
@@ -124,32 +124,30 @@ export default function TrendChart({
           <path d={hotPath} fill="none" stroke="var(--hot-br)" strokeWidth="2.2" />
 
           {/* pontos finais */}
-          <circle cx={xAt(15, width, pad)} cy={coolY} r="3.6" fill="var(--cool-br)" />
-          <circle cx={xAt(15, width, pad)} cy={hotY} r="3.6" fill="var(--hot-br)" />
+          <circle cx={xAt(15, width, pad)} cy={coolY0} r="3.6" fill="var(--cool-br)" />
+          <circle cx={xAt(15, width, pad)} cy={hotY0} r="3.6" fill="var(--hot-br)" />
 
-          {/* Labels no final, com cor correspondente */}
-          {/* HOT */}
-          <g transform={`translate(${labelX}, ${hotY + hotDY - labelH / 2})`}>
-            <rect x={0} y={0} width={labelW} height={labelH} rx={9} fill="rgba(255,255,255,0.85)" />
-            {/* barra/acento na cor da linha */}
-            <rect x={0} y={0} width={4} height={labelH} rx={9} fill="var(--hot-br)" />
-            <text x={10} y={14} fontSize="10" fill="#374151">
+          {/* HOT label: X fixo na direita, Y segue o ponto */}
+          <g transform={`translate(${cardX}, ${hotY - cardH / 2})`}>
+            <rect x={0} y={0} width={cardW} height={cardH} rx={10} fill="rgba(255,255,255,0.90)" />
+            <rect x={0} y={0} width={4} height={cardH} rx={10} fill="var(--hot-br)" />
+            <text x={10} y={15} fontSize="10" fill="#374151">
               {hot.name}
             </text>
-            <text x={10} y={29} fontSize="12" fill="var(--hot-br)" fontWeight={800}>
+            <text x={10} y={31} fontSize="13" fill="var(--hot-br)" fontWeight={800}>
               {arrow("up")}
               {hotPct}%
             </text>
           </g>
 
-          {/* COOL */}
-          <g transform={`translate(${labelX}, ${coolY + coolDY - labelH / 2})`}>
-            <rect x={0} y={0} width={labelW} height={labelH} rx={9} fill="rgba(255,255,255,0.85)" />
-            <rect x={0} y={0} width={4} height={labelH} rx={9} fill="var(--cool-br)" />
-            <text x={10} y={14} fontSize="10" fill="#374151">
+          {/* COOL label */}
+          <g transform={`translate(${cardX}, ${coolY - cardH / 2})`}>
+            <rect x={0} y={0} width={cardW} height={cardH} rx={10} fill="rgba(255,255,255,0.90)" />
+            <rect x={0} y={0} width={4} height={cardH} rx={10} fill="var(--cool-br)" />
+            <text x={10} y={15} fontSize="10" fill="#374151">
               {cool.name}
             </text>
-            <text x={10} y={29} fontSize="12" fill="var(--cool-br)" fontWeight={800}>
+            <text x={10} y={31} fontSize="13" fill="var(--cool-br)" fontWeight={800}>
               {arrow("down")}
               {coolPct}%
             </text>
