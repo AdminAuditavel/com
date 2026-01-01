@@ -5,6 +5,19 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Comentaram — tokens de cor (MVP) */
+  --hot-bg: #fff7ed; /* laranja bem claro */
+  --hot-br: #fb923c; /* laranja */
+  --hot-tx: #9a3412; /* laranja escuro */
+
+  --steady-bg: #f8fafc; /* cinza frio claro */
+  --steady-br: #cbd5e1; /* cinza */
+  --steady-tx: #334155; /* slate */
+
+  --cool-bg: #eff6ff; /* azul bem claro */
+  --cool-br: #60a5fa; /* azul */
+  --cool-tx: #1e3a8a; /* azul escuro */
 }
 
 @theme inline {
@@ -28,25 +41,7 @@ body {
 }
 
 /* =========================
-   Comentaram — tokens de cor (MVP)
-   ========================= */
-:root {
-  --hot-bg: #fff7ed; /* laranja bem claro */
-  --hot-br: #fb923c; /* laranja */
-  --hot-tx: #9a3412; /* laranja escuro */
-
-  --steady-bg: #f8fafc; /* cinza frio claro */
-  --steady-br: #cbd5e1; /* cinza */
-  --steady-tx: #334155; /* slate */
-
-  --cool-bg: #eff6ff; /* azul bem claro */
-  --cool-br: #60a5fa; /* azul */
-  --cool-tx: #1e3a8a; /* azul escuro */
-}
-
-/* =========================
    Comentaram — bolhas “vivas”
-   (motor CSS usando --e (0..1) e --t (-1..1))
    ========================= */
 
 /* Batimento base (pulso) + inflar (volume) */
@@ -62,17 +57,6 @@ body {
     transform: translateZ(0) scale(calc(var(--inflate, 1) * (1 + var(--beat) * 0.65)));
   }
 }
-
-.bubble {
-  --e: 0.55;
-  --t: 0;
-
-  /* “volume” (isso é o balão enchendo/esvaziando) */
-  --inflate: calc(1 + var(--e) * 0.16);
-
-  --beat: calc(0.012 + var(--e) * 0.04);
-  --glow: calc(5px + var(--e) * 16px);
-  --ring: currentColor;
 
 /* Halo orgânico (wobble sutil) */
 @keyframes bubbleWobble {
@@ -107,10 +91,14 @@ body {
   }
 }
 
+/* Base */
 .bubble {
   /* defaults (caso não venha inline) */
   --e: 0.55; /* energia 0..1 */
   --t: 0; /* trend -1..1 */
+
+  /* “volume” (balão enchendo/esvaziando) */
+  --inflate: calc(1 + var(--e) * 0.16);
 
   /* derivados */
   --beat: calc(0.012 + var(--e) * 0.04);
@@ -247,7 +235,7 @@ body {
   z-index: 60; /* acima das bolhas */
 }
 
-/* “balão de comentário” (menos “carimbado”, com variação de tamanho/rotação) */
+/* “balão de comentário” */
 .flow-particle {
   position: absolute;
   left: 0;
