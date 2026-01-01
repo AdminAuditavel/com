@@ -11,11 +11,7 @@ type Bubble = {
   label: string;
   state: "hot" | "steady" | "cool";
   size: "lg" | "md" | "sm";
-
-  // contínuo (0..1) para dar “vida”
-  energy: number;
-
-  // -1 (caindo), 0 (neutro), 1 (subindo)
+  energy: number; // 0..1
   trend: -1 | 0 | 1;
 };
 
@@ -68,6 +64,26 @@ function clamp01(n: number) {
 export default function BubbleBoard() {
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
 
+  // pager / categoria ativa
+  const [activeIndex, setActiveIndex] = useState(0);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+
+  const goTo = useCallback((idx: number) => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const w = el.clientWidth;
+    el.scrollTo({ left: idx * w, behavior: "smooth" });
+    setActiveIndex(idx);
+  }, []);
+
+  const onScroll = useCallback(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const w = el.clientWidth || 1;
+    const idx = Math.round(el.scrollLeft / w);
+    if (idx !== activeIndex) setActiveIndex(idx);
+  }, [activeIndex]);
+
   // refs dos botões (para saber o DOMRect de cada bolha)
   const bubbleElsRef = useRef(new Map<string, HTMLButtonElement | null>());
 
@@ -82,7 +98,7 @@ export default function BubbleBoard() {
     return el ? el.getBoundingClientRect() : null;
   }, []);
 
-  // Modal: guarda id e deriva estado atual do data (não “congela”)
+  // Modal
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const isOpen = !!selectedId;
 
@@ -104,17 +120,17 @@ export default function BubbleBoard() {
     return data.flatMap((c) => c.items.filter((b) => b.state === "cool").map((b) => b.id));
   }, [data]);
 
-  // pontos fixos (2 “infinitos”): inicializa no client e atualiza em resize
+  // pontos fixos (2 “infinitos”): atualiza em resize
   const [origins, setOrigins] = useState(() => ({
-    originA: { x: -40, y: 900 }, // placeholder, ajusta no effect
+    originA: { x: -40, y: 900 },
     originB: { x: 900, y: -40 },
   }));
 
   useEffect(() => {
     const update = () => {
       setOrigins({
-        originA: { x: -40, y: window.innerHeight + 40 }, // canto inferior esquerdo “fora”
-        originB: { x: window.innerWidth + 40, y: -40 }, // canto superior direito “fora”
+        originA: { x: -40, y: window.innerHeight + 40 },
+        originB: { x: window.innerWidth + 40, y: -40 },
       });
     };
     update();
@@ -124,7 +140,7 @@ export default function BubbleBoard() {
 
   const allIds = useMemo(() => data.flatMap((c) => c.items.map((b) => b.id)), [data]);
 
-  // Simulação do pulso (mais frequente e contínua)
+  // Simulação do pulso (mais “vivo”)
   useEffect(() => {
     const t = window.setInterval(() => {
       const pick = allIds[Math.floor(Math.random() * allIds.length)];
@@ -136,23 +152,18 @@ export default function BubbleBoard() {
           items: cat.items.map((b) => {
             if (b.id !== pick) return b;
 
-            // ciclo: cool -> steady -> hot -> cool
             const nextState: Bubble["state"] =
               b.state === "cool" ? "steady" : b.state === "steady" ? "hot" : "cool";
 
-            // tendência pela direção da mudança
             const trend: Bubble["trend"] =
               nextState === "hot" ? 1 : nextState === "cool" ? -1 : 0;
 
-            // energia alvo por estado (com leve aleatoriedade)
             const baseTarget =
-              nextState === "hot" ? 0.85 : nextState === "steady" ? 0.58 : 0.25;
+              nextState === "hot" ? 0.88 : nextState === "steady" ? 0.6 : 0.22;
             const target = clamp01(baseTarget + (Math.random() * 0.12 - 0.06));
 
-            // aproxima suave (orgânico)
             const nextEnergy = clamp01(b.energy + (target - b.energy) * 0.55);
 
-            // tamanho ainda existe, mas com menos “degrau”
             const nextSize: Bubble["size"] =
               nextState === "hot" && nextEnergy > 0.78
                 ? b.size === "sm"
@@ -168,7 +179,7 @@ export default function BubbleBoard() {
           }),
         }))
       );
-    }, 2200);
+    }, 2000);
 
     return () => window.clearInterval(t);
   }, [allIds]);
@@ -183,59 +194,109 @@ export default function BubbleBoard() {
         coolIds={coolIds}
       />
 
-      <section className="px-5 pb-10 space-y-10">
-        {data.map((cat) => (
-          <div key={cat.title}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xs font-semibold tracking-widest text-gray-500">
-                {cat.title}
-              </h2>
-            </div>
-
-            {/* Removido o “card/quadrado” (border + bg) para não parecer preso */}
-            <div className="py-2">
-              <div className="flex flex-wrap gap-3">
-                {cat.items.map((b) => (
-                  <button
-                    key={b.id}
-                    ref={setBubbleEl(b.id)}
-                    type="button"
-                    className={[
-                      "bubble relative rounded-full border",
-                      "flex flex-col items-center justify-center",
-                      "shadow-sm active:scale-[0.98] transition",
-                      "select-none overflow-hidden",
-                      b.state === "hot" && "bubble-hot",
-                      b.state === "steady" && "bubble-steady",
-                      b.state === "cool" && "bubble-cool",
-                      b.trend === 1 && "bubble-rise",
-                      b.trend === -1 && "bubble-fall",
-                      sizeClasses(b.size),
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    style={
-                      {
-                        ["--e" as any]: b.energy,
-                        ["--t" as any]: b.trend,
-                      } as React.CSSProperties
-                    }
-                    aria-label={`${b.label} — ${stateLabel(b.state)}`}
-                    onClick={() => setSelectedId(b.id)}
-                  >
-                    <span className="relative z-10 font-medium leading-tight text-center px-2">
-                      {b.label}
-                    </span>
-                    <span className="relative z-10 mt-1 text-[10px] text-gray-600">
-                      {stateLabel(b.state)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
+      {/* Menu (tabs) fixo no topo da área */}
+      <div className="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-gray-100">
+        <div className="px-5 py-3">
+          <div className="flex gap-2">
+            {data.map((cat, idx) => {
+              const active = idx === activeIndex;
+              return (
+                <button
+                  key={cat.title}
+                  type="button"
+                  onClick={() => goTo(idx)}
+                  className={[
+                    "px-3 py-2 rounded-full text-xs font-semibold tracking-widest",
+                    "transition border",
+                    active
+                      ? "bg-gray-900 text-white border-gray-900"
+                      : "bg-white text-gray-600 border-gray-200",
+                  ].join(" ")}
+                  aria-current={active ? "page" : undefined}
+                >
+                  {cat.title}
+                </button>
+              );
+            })}
           </div>
-        ))}
-      </section>
+          <div className="mt-2 text-[11px] text-gray-500">
+            Arraste para o lado para trocar de assunto
+          </div>
+        </div>
+      </div>
+
+      {/* Pager horizontal (cada categoria ocupa “uma tela”) */}
+      <div
+        ref={viewportRef}
+        onScroll={onScroll}
+        className={[
+          "w-full overflow-x-auto",
+          "snap-x snap-mandatory",
+          "scroll-smooth",
+          "[scrollbar-width:none] [-ms-overflow-style:none]",
+        ].join(" ")}
+        style={{
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        {/* esconder scrollbar no webkit */}
+        <style jsx>{`
+          div::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
+
+        <div className="flex w-full">
+          {data.map((cat) => (
+            <section
+              key={cat.title}
+              className="w-full flex-none snap-center px-5 pb-10"
+              style={{ minHeight: "calc(100vh - 92px)" }}
+            >
+              <div className="pt-6">
+                <div className="flex flex-wrap gap-3">
+                  {cat.items.map((b) => (
+                    <button
+                      key={b.id}
+                      ref={setBubbleEl(b.id)}
+                      type="button"
+                      className={[
+                        "bubble relative rounded-full border",
+                        "flex flex-col items-center justify-center",
+                        "shadow-sm active:scale-[0.98] transition",
+                        "select-none overflow-hidden",
+                        b.state === "hot" && "bubble-hot",
+                        b.state === "steady" && "bubble-steady",
+                        b.state === "cool" && "bubble-cool",
+                        b.trend === 1 && "bubble-rise",
+                        b.trend === -1 && "bubble-fall",
+                        sizeClasses(b.size),
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      style={
+                        {
+                          ["--e" as any]: b.energy,
+                          ["--t" as any]: b.trend,
+                        } as React.CSSProperties
+                      }
+                      aria-label={`${b.label} — ${stateLabel(b.state)}`}
+                      onClick={() => setSelectedId(b.id)}
+                    >
+                      <span className="relative z-10 font-medium leading-tight text-center px-2">
+                        {b.label}
+                      </span>
+                      <span className="relative z-10 mt-1 text-[10px] text-gray-600">
+                        {stateLabel(b.state)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
 
       <TopicModal open={isOpen} topic={selected} onClose={() => setSelectedId(null)} />
     </>
