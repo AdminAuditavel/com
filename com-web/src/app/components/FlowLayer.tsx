@@ -15,7 +15,6 @@ type FlowParticle = {
   sz?: string;
   rot?: string;
 
-  // para disparar impacto no alvo correto
   targetId?: string;
   impactDelta?: number;
 };
@@ -26,6 +25,38 @@ function rand(min: number, max: number) {
 
 function pickRandom<T>(arr: T[]) {
   return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function deg(n: number) {
+  return (n * Math.PI) / 180;
+}
+
+/**
+ * Mira na BORDA e entra 1/3 do raio:
+ * - escolhe um ângulo aleatório
+ * - calcula um ponto na borda do “círculo” (aprox: min(w,h)/2)
+ * - puxa esse ponto para dentro (1/3 do raio)
+ */
+function targetPointInsideBubble(rect: DOMRect) {
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+
+  // aproxima raio do círculo (usa o menor lado)
+  const r = Math.min(rect.width, rect.height) / 2;
+
+  // ângulo aleatório (com leve bias pra evitar ficar sempre “perfeito”)
+  const a = deg(rand(0, 360));
+
+  // ponto na borda
+  const bx = cx + Math.cos(a) * r;
+  const by = cy + Math.sin(a) * r;
+
+  // entra 1/3 do raio em direção ao centro
+  const ix = bx + (cx - bx) * (1 / 3);
+  const iy = by + (cy - by) * (1 / 3);
+
+  // jitter leve (sensação orgânica, mas sem “errar o alvo”)
+  return { x: ix + rand(-3, 3), y: iy + rand(-3, 3) };
 }
 
 export default function FlowLayer({
@@ -117,9 +148,8 @@ export default function FlowLayer({
           const rect = getTargetRectById(id);
           if (!rect) continue;
 
-          // mire na bolha visível
-          const tx = rect.left + rect.width / 2 + rand(-8, 8);
-          const ty = rect.top + rect.height / 2 + rand(-8, 8);
+          // alvo: borda -> entra 1/3 do raio
+          const { x: tx, y: ty } = targetPointInsideBubble(rect);
 
           const durMs = Math.round(rand(620, 980));
 
@@ -139,7 +169,6 @@ export default function FlowLayer({
 
           newOnes.push(p);
 
-          // dispara impacto no final (quando “chega”)
           const impactT = window.setTimeout(() => {
             onImpact(id, IN_DELTA);
           }, durMs);
@@ -154,8 +183,8 @@ export default function FlowLayer({
           const rect = getTargetRectById(id);
           if (!rect) continue;
 
-          const fx = rect.left + rect.width / 2 + rand(-8, 8);
-          const fy = rect.top + rect.height / 2 + rand(-8, 8);
+          // OUT: começa de dentro (1/3 do raio) e sai para originB
+          const { x: fx, y: fy } = targetPointInsideBubble(rect);
 
           const durMs = Math.round(rand(820, 1450));
 
@@ -175,7 +204,7 @@ export default function FlowLayer({
 
           newOnes.push(p);
 
-          // para OUT, o “impacto” é drenagem — pode acontecer no início (quando sai)
+          // drenagem acontece ao sair (imediato)
           onImpact(id, OUT_DELTA);
 
           const removeT = window.setTimeout(() => {
