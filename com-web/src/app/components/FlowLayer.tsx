@@ -10,8 +10,6 @@ type FlowParticle = {
   y1: string;
   dur: string;
   color: string;
-
-  // vars visuais opcionais (deixa menos “carimbado”)
   sz?: string;
   rot?: string;
 };
@@ -43,18 +41,19 @@ export default function FlowLayer({
   const hotList = useMemo(() => [...hotIds], [hotIds]);
   const coolList = useMemo(() => [...coolIds], [coolIds]);
 
-  // Ajuste fino (valores “bons” para parecer vivo sem derreter o celular)
-  const MAX_PARTICLES = 140; // antes era ~40 (baixo demais para “causa”)
-  const BASE_PPS = 0.6; // particles per second mínimos quando quase nada acontece
-  const HOT_PPS_PER_BUBBLE = 2.4; // quanto cada hot adiciona ao fluxo
-  const COOL_PPS_PER_BUBBLE = 2.0; // quanto cada cool adiciona ao fluxo
+  // Mobile: cap e taxas calibradas p/ ficar VISÍVEL sem travar
+  const MAX_PARTICLES = 110;
 
-  // Bursts deixam o sistema parecer “organismo” (rajadas curtas)
-  const BURST_CHANCE_PER_TICK = 0.12; // 12%
+  // particles per second (PPS)
+  const BASE_PPS = 1.0;
+  const HOT_PPS_PER_BUBBLE = 3.6;
+  const COOL_PPS_PER_BUBBLE = 3.0;
+
+  // bursts
+  const BURST_CHANCE_PER_TICK = 0.16;
   const BURST_MIN = 2;
-  const BURST_MAX = 5;
+  const BURST_MAX = 6;
 
-  // “acumulador” de emissões (para PPS virar partículas discretas)
   const carryRef = useRef(0);
 
   useEffect(() => {
@@ -65,25 +64,21 @@ export default function FlowLayer({
   }, []);
 
   useEffect(() => {
-    // tick mais rápido; emissão real é controlada por PPS (não “1 por tick”)
-    const TICK_MS = 80;
+    const TICK_MS = 70;
 
     const interval = window.setInterval(() => {
       const hotN = hotList.length;
       const coolN = coolList.length;
 
-      // Se não há nada hot/cool, praticamente para (mas não zera: mantém “vida”)
       const pps = Math.max(
         BASE_PPS,
         hotN * HOT_PPS_PER_BUBBLE + coolN * COOL_PPS_PER_BUBBLE
       );
 
-      // Budget baseado em PPS e tick
       carryRef.current += (pps * TICK_MS) / 1000;
 
-      // Burst: em momentos aleatórios, cria uma rajada extra (muito perceptível)
       let burstExtra = 0;
-      if (Math.random() < BURST_CHANCE_PER_TICK && (hotN + coolN) > 0) {
+      if (Math.random() < BURST_CHANCE_PER_TICK && hotN + coolN > 0) {
         burstExtra = Math.floor(rand(BURST_MIN, BURST_MAX + 1));
       }
 
@@ -91,31 +86,31 @@ export default function FlowLayer({
       if (toSpawn <= 0) return;
       carryRef.current -= Math.floor(carryRef.current);
 
-      // Respeita orçamento global (não cria se está lotado)
+      // evita lotar
       const headroom = MAX_PARTICLES - particles.length;
       if (headroom <= 0) return;
       toSpawn = Math.min(toSpawn, headroom);
 
-      // Ratio: mais hot => mais IN; mais cool => mais OUT
       const total = hotN + coolN;
       const hotBias = total === 0 ? 0.5 : hotN / total;
 
       const newOnes: FlowParticle[] = [];
 
       for (let i = 0; i < toSpawn; i++) {
+        // mais hot => mais IN
         const doHot =
-          hotN > 0 && (coolN === 0 || Math.random() < Math.max(0.25, Math.min(0.85, hotBias)));
+          hotN > 0 &&
+          (coolN === 0 || Math.random() < Math.max(0.25, Math.min(0.9, hotBias + 0.15)));
 
         if (doHot) {
           const id = pickRandom(hotList);
           const rect = getTargetRectById(id);
           if (!rect) continue;
 
-          // destino = centro da bolha (com jitter pra parecer “caindo dentro”)
-          const tx = rect.left + rect.width / 2 + rand(-6, 6);
-          const ty = rect.top + rect.height / 2 + rand(-6, 6);
+          const tx = rect.left + rect.width / 2 + rand(-10, 10);
+          const ty = rect.top + rect.height / 2 + rand(-10, 10);
 
-          const durMs = Math.round(rand(650, 1050)); // mais rápido = “aquecendo”
+          const durMs = Math.round(rand(620, 980));
           const p: FlowParticle = {
             id: crypto.randomUUID(),
             x0: `${originA.x}px`,
@@ -124,36 +119,8 @@ export default function FlowLayer({
             y1: `${ty}px`,
             dur: `${durMs}ms`,
             color: "var(--hot-tx)",
-            sz: `${Math.round(rand(11, 16))}px`,
-            rot: `${Math.round(rand(-18, 18))}deg`,
-          };
-
-          newOnes.push(p);
-
-          const to = window.setTimeout(() => {
-            setParticles((prev) => prev.filter((x) => x.id !== p.id));
-          }, durMs + 120);
-          timersRef.current.push(to);
-        } else {
-          const id = pickRandom(coolList);
-          const rect = getTargetRectById(id);
-          if (!rect) continue;
-
-          // origem = centro da bolha (com jitter pra parecer “vazando”)
-          const fx = rect.left + rect.width / 2 + rand(-6, 6);
-          const fy = rect.top + rect.height / 2 + rand(-6, 6);
-
-          const durMs = Math.round(rand(900, 1500)); // mais lento = “esfriando/saindo”
-          const p: FlowParticle = {
-            id: crypto.randomUUID(),
-            x0: `${fx}px`,
-            y0: `${fy}px`,
-            x1: `${originB.x}px`,
-            y1: `${originB.y}px`,
-            dur: `${durMs}ms`,
-            color: "var(--cool-tx)",
-            sz: `${Math.round(rand(11, 16))}px`,
-            rot: `${Math.round(rand(-18, 18))}deg`,
+            sz: `${Math.round(rand(12, 18))}px`,
+            rot: `${Math.round(rand(-22, 22))}deg`,
           };
 
           newOnes.push(p);
@@ -162,12 +129,38 @@ export default function FlowLayer({
             setParticles((prev) => prev.filter((x) => x.id !== p.id));
           }, durMs + 140);
           timersRef.current.push(to);
+        } else {
+          const id = pickRandom(coolList);
+          const rect = getTargetRectById(id);
+          if (!rect) continue;
+
+          const fx = rect.left + rect.width / 2 + rand(-10, 10);
+          const fy = rect.top + rect.height / 2 + rand(-10, 10);
+
+          const durMs = Math.round(rand(820, 1450));
+          const p: FlowParticle = {
+            id: crypto.randomUUID(),
+            x0: `${fx}px`,
+            y0: `${fy}px`,
+            x1: `${originB.x}px`,
+            y1: `${originB.y}px`,
+            dur: `${durMs}ms`,
+            color: "var(--cool-tx)",
+            sz: `${Math.round(rand(12, 18))}px`,
+            rot: `${Math.round(rand(-22, 22))}deg`,
+          };
+
+          newOnes.push(p);
+
+          const to = window.setTimeout(() => {
+            setParticles((prev) => prev.filter((x) => x.id !== p.id));
+          }, durMs + 160);
+          timersRef.current.push(to);
         }
       }
 
       if (newOnes.length === 0) return;
 
-      // Mantém janela deslizante (evita crescimento infinito e dá prioridade ao “agora”)
       setParticles((prev) => {
         const merged = prev.concat(newOnes);
         if (merged.length <= MAX_PARTICLES) return merged;
