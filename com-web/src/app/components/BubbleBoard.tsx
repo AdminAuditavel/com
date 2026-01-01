@@ -57,19 +57,13 @@ function asDetail(b: Bubble): TopicDetail {
   return { id: b.id, label: b.label, state: b.state };
 }
 
-function makeSeries(mode: "up" | "down" | "steady") {
+function makeSeries(mode: "up" | "down") {
   const pts: { t: number; v: number }[] = [];
-  let v = mode === "up" ? 0.35 : mode === "down" ? 0.7 : 0.52;
+  let v = mode === "up" ? 0.35 : 0.7;
 
   for (let i = 0; i <= 15; i++) {
-    const drift =
-      mode === "up" ? 0.018 : mode === "down" ? -0.018 : 0.0;
-
+    const drift = mode === "up" ? 0.018 : -0.018;
     v = clamp01(v + drift + (Math.random() * 0.06 - 0.03));
-
-    // mantém “steady” mais contido
-    if (mode === "steady") v = clamp01(v + (0.52 - v) * 0.25);
-
     pts.push({ t: i, v });
   }
   return pts;
@@ -78,7 +72,6 @@ function makeSeries(mode: "up" | "down" | "steady") {
 export default function BubbleBoard() {
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
 
-  // tabs/pager
   const [activeIndex, setActiveIndex] = useState(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
@@ -98,10 +91,8 @@ export default function BubbleBoard() {
     if (idx !== activeIndex) setActiveIndex(idx);
   }, [activeIndex]);
 
-  // modal
   const [selected, setSelected] = useState<TopicDetail | null>(null);
 
-  // refs das bolhas em destaque (hot/cool para partículas)
   const hotRef = useRef<HTMLButtonElement | null>(null);
   const coolRef = useRef<HTMLButtonElement | null>(null);
 
@@ -138,20 +129,11 @@ export default function BubbleBoard() {
           return {
             ...cat,
             items: cat.items.map((b) => {
-              if (b.id === hotBubble.id) {
-                return { ...b, state: "hot", energy: clamp01(b.energy + 0.014), size: "md" };
-              }
-              if (b.id === coolBubble.id) {
-                return { ...b, state: "cool", energy: clamp01(b.energy - 0.011), size: "sm" };
-              }
+              if (b.id === hotBubble.id) return { ...b, state: "hot", energy: clamp01(b.energy + 0.014), size: "md" };
+              if (b.id === coolBubble.id) return { ...b, state: "cool", energy: clamp01(b.energy - 0.011), size: "sm" };
               if (b.id === steadyBubble.id) {
                 const baseline = 0.52;
-                return {
-                  ...b,
-                  state: "steady",
-                  energy: clamp01(b.energy + (baseline - b.energy) * 0.06),
-                  size: "sm",
-                };
+                return { ...b, state: "steady", energy: clamp01(b.energy + (baseline - b.energy) * 0.06), size: "sm" };
               }
               const baseline = 0.5;
               return { ...b, state: "steady", energy: clamp01(b.energy + (baseline - b.energy) * 0.03) };
@@ -164,10 +146,8 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, [activeCat, activeIndex, hotBubble?.id, coolBubble?.id, steadyBubble?.id]);
 
-  // séries mudam junto com o par (para o label mostrar o nome certo)
   const hotSeries = useMemo(() => makeSeries("up"), [pairTick, activeIndex]);
   const coolSeries = useMemo(() => makeSeries("down"), [pairTick, activeIndex]);
-  const steadySeries = useMemo(() => makeSeries("steady"), [pairTick, activeIndex]);
 
   const getHotRect = useCallback(() => hotRef.current?.getBoundingClientRect() ?? null, []);
   const getCoolRect = useCallback(() => coolRef.current?.getBoundingClientRect() ?? null, []);
@@ -177,7 +157,6 @@ export default function BubbleBoard() {
       <BubbleParticles active={!!hotBubble} direction="up" colorVar="var(--hot-br)" getSourceRect={getHotRect} />
       <BubbleParticles active={!!coolBubble} direction="down" colorVar="var(--cool-br)" getSourceRect={getCoolRect} />
 
-      {/* Tabs */}
       <div className="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-gray-100">
         <div className="px-5 py-3">
           <div className="flex gap-2">
@@ -206,16 +185,10 @@ export default function BubbleBoard() {
         </div>
       </div>
 
-      {/* Pager horizontal */}
       <div
         ref={viewportRef}
         onScroll={onScroll}
-        className={[
-          "w-full overflow-x-auto",
-          "snap-x snap-mandatory",
-          "scroll-smooth",
-          "[scrollbar-width:none] [-ms-overflow-style:none]",
-        ].join(" ")}
+        className={["w-full overflow-x-auto", "snap-x snap-mandatory", "scroll-smooth", "[scrollbar-width:none] [-ms-overflow-style:none]"].join(" ")}
         style={{ WebkitOverflowScrolling: "touch" }}
       >
         <style jsx>{`
@@ -236,7 +209,6 @@ export default function BubbleBoard() {
             return (
               <section key={cat.title} className="w-full flex-none snap-center px-5 pb-8" style={{ minHeight: "calc(100dvh - 72px)" }}>
                 <div className="pt-6 flex flex-col gap-5">
-                  {/* 3 bolhas principais */}
                   <div className="flex justify-center gap-4">
                     <button
                       ref={isActive ? hotRef : undefined}
@@ -271,16 +243,13 @@ export default function BubbleBoard() {
                     </button>
                   </div>
 
-                  {/* Gráfico 15 min com 3 linhas e labels na ponta */}
                   <TrendChart
                     now={new Date()}
                     hot={{ name: hot?.label ?? "Quente", points: hotSeries }}
                     cool={{ name: cool?.label ?? "Frio", points: coolSeries }}
-                    steady={{ name: steady?.label ?? "Estável", points: steadySeries }}
-                    height={140}
+                    height={180}
                   />
 
-                  {/* Todas as bolhas menores */}
                   <div className="pt-1">
                     <div className="flex flex-wrap gap-3 justify-center">
                       {items.map((b) => (
