@@ -4,8 +4,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-type Target = { id: string; weight: number };
-
 type FlowParticle = {
   id: string;
   x0: string;
@@ -22,94 +20,41 @@ function rand(min: number, max: number) {
   return Math.random() * (max - min) + min;
 }
 
-function pickWeighted(targets: Target[]): string | null {
-  if (targets.length === 0) return null;
-  let sum = 0;
-  for (const t of targets) sum += Math.max(0, t.weight);
-
-  if (sum <= 0) return targets[0]!.id;
-
-  let r = Math.random() * sum;
-  for (const t of targets) {
-    r -= Math.max(0, t.weight);
-    if (r <= 0) return t.id;
-  }
-  return targets[targets.length - 1]!.id;
-}
-
-/**
- * Mira na BORDA e entra 1/3 do raio:
- * - escolhe um ângulo aleatório
- * - calcula um ponto na borda do “círculo” (aprox: min(w,h)/2)
- * - puxa esse ponto para dentro (1/3 do raio)
- *
- * Para “feixe” mais claro, usamos jitter menor.
- */
-function targetPointInsideBubble(rect: DOMRect) {
-  const cx = rect.left + rect.width / 2;
-  const cy = rect.top + rect.height / 2;
-
-  const r = Math.min(rect.width, rect.height) / 2;
-  const a = rand(0, Math.PI * 2);
-
-  const bx = cx + Math.cos(a) * r;
-  const by = cy + Math.sin(a) * r;
-
-  const ix = bx + (cx - bx) * (1 / 3);
-  const iy = by + (cy - by) * (1 / 3);
-
-  return { x: ix + rand(-2, 2), y: iy + rand(-2, 2) };
-}
-
-/**
- * Origem “faixa” fora da tela (em vez de um ponto único):
- * cria um rio mais natural.
- */
-function spawnFromBand(originA: { x: number; y: number }) {
-  // banda no canto inferior-esquerdo: espalha um pouco em X e Y
-  return {
-    x: originA.x + rand(-30, 90),
-    y: originA.y + rand(-90, 30),
-  };
+function pickRandom<T>(arr: T[]) {
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
 export default function FlowLayer({
   originA,
   originB,
   getTargetRectById,
-  hotTargets,
-  coolTargets,
-  onImpact,
+  hotIds,
+  coolIds,
 }: {
   originA: { x: number; y: number };
   originB: { x: number; y: number };
   getTargetRectById: (id: string) => DOMRect | null;
-  hotTargets: Target[];
-  coolTargets: Target[];
-  onImpact: (id: string, delta: number) => void;
+  hotIds: string[];
+  coolIds: string[];
 }) {
   const [particles, setParticles] = useState<FlowParticle[]>([]);
   const timersRef = useRef<number[]>([]);
 
-  const hotList = useMemo(() => hotTargets, [hotTargets]);
-  const coolList = useMemo(() => coolTargets, [coolTargets]);
+  const hotList = useMemo(() => [...hotIds], [hotIds]);
+  const coolList = useMemo(() => [...coolIds], [coolIds]);
 
   // Mobile: visível e performático
-  const MAX_PARTICLES = 130;
+  const MAX_PARTICLES = 110;
 
-  // PPS (agressivo o suficiente pra ficar óbvio)
-  const BASE_PPS = 1.1;
-  const HOT_PPS_PER_TARGET = 6.0;
-  const COOL_PPS_PER_TARGET = 4.5;
+  // PPS
+  const BASE_PPS = 1.0;
+  const HOT_PPS_PER_BUBBLE = 3.6;
+  const COOL_PPS_PER_BUBBLE = 3.0;
 
   // bursts
-  const BURST_CHANCE_PER_TICK = 0.22;
+  const BURST_CHANCE_PER_TICK = 0.16;
   const BURST_MIN = 2;
-  const BURST_MAX = 7;
-
-  // impacto
-  const IN_DELTA = 0.02;
-  const OUT_DELTA = -0.016;
+  const BURST_MAX = 6;
 
   const carryRef = useRef(0);
 
@@ -129,7 +74,7 @@ export default function FlowLayer({
 
       const pps = Math.max(
         BASE_PPS,
-        hotN * HOT_PPS_PER_TARGET + coolN * COOL_PPS_PER_TARGET
+        hotN * HOT_PPS_PER_BUBBLE + coolN * COOL_PPS_PER_BUBBLE
       );
 
       carryRef.current += (pps * TICK_MS) / 1000;
@@ -147,7 +92,6 @@ export default function FlowLayer({
       if (headroom <= 0) return;
       toSpawn = Math.min(toSpawn, headroom);
 
-      // “feixe”: favorece IN quando há hot
       const total = hotN + coolN;
       const hotBias = total === 0 ? 0.5 : hotN / total;
 
@@ -156,50 +100,42 @@ export default function FlowLayer({
       for (let i = 0; i < toSpawn; i++) {
         const doHot =
           hotN > 0 &&
-          (coolN === 0 || Math.random() < Math.max(0.35, Math.min(0.94, hotBias + 0.25)));
+          (coolN === 0 || Math.random() < Math.max(0.25, Math.min(0.9, hotBias + 0.15)));
 
         if (doHot) {
-          const id = pickWeighted(hotList);
-          if (!id) continue;
-
+          const id = pickRandom(hotList);
           const rect = getTargetRectById(id);
           if (!rect) continue;
 
-          const { x: tx, y: ty } = targetPointInsideBubble(rect);
-          const start = spawnFromBand(originA);
+          const tx = rect.left + rect.width / 2 + rand(-10, 10);
+          const ty = rect.top + rect.height / 2 + rand(-10, 10);
 
-          const durMs = Math.round(rand(520, 860));
+          const durMs = Math.round(rand(620, 980));
           const p: FlowParticle = {
             id: crypto.randomUUID(),
-            x0: `${start.x}px`,
-            y0: `${start.y}px`,
+            x0: `${originA.x}px`,
+            y0: `${originA.y}px`,
             x1: `${tx}px`,
             y1: `${ty}px`,
             durMs,
             color: "var(--hot-tx)",
             sz: `${Math.round(rand(12, 18))}px`,
-            rot: `${Math.round(rand(-18, 18))}deg`,
+            rot: `${Math.round(rand(-22, 22))}deg`,
           };
 
           newOnes.push(p);
-
-          const impactT = window.setTimeout(() => {
-            onImpact(id, IN_DELTA);
-          }, durMs);
-          timersRef.current.push(impactT);
 
           const removeT = window.setTimeout(() => {
             setParticles((prev) => prev.filter((x) => x.id !== p.id));
           }, durMs + 140);
           timersRef.current.push(removeT);
         } else {
-          const id = pickWeighted(coolList);
-          if (!id) continue;
-
+          const id = pickRandom(coolList);
           const rect = getTargetRectById(id);
           if (!rect) continue;
 
-          const { x: fx, y: fy } = targetPointInsideBubble(rect);
+          const fx = rect.left + rect.width / 2 + rand(-10, 10);
+          const fy = rect.top + rect.height / 2 + rand(-10, 10);
 
           const durMs = Math.round(rand(820, 1450));
           const p: FlowParticle = {
@@ -211,13 +147,10 @@ export default function FlowLayer({
             durMs,
             color: "var(--cool-tx)",
             sz: `${Math.round(rand(12, 18))}px`,
-            rot: `${Math.round(rand(-18, 18))}deg`,
+            rot: `${Math.round(rand(-22, 22))}deg`,
           };
 
           newOnes.push(p);
-
-          // drenagem ao sair
-          onImpact(id, OUT_DELTA);
 
           const removeT = window.setTimeout(() => {
             setParticles((prev) => prev.filter((x) => x.id !== p.id));
@@ -237,7 +170,7 @@ export default function FlowLayer({
 
     return () => window.clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [originA.x, originA.y, originB.x, originB.y, getTargetRectById, hotList, coolList, particles.length, onImpact]);
+  }, [originA.x, originA.y, originB.x, originB.y, getTargetRectById, hotList, coolList, particles.length]);
 
   return (
     <div className="flow-layer" aria-hidden="true">
