@@ -63,18 +63,24 @@ export default function BubbleBoard() {
           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
             <div className="flex flex-wrap gap-3">
               {cat.items.map((b) => (
-                className={[
-                  "rounded-full border bg-white",
-                  "flex flex-col items-center justify-center",
-                  "shadow-sm active:scale-[0.98] transition",
-                  "select-none",
-                  b.state === "hot" && "animate-pulseSoft border-gray-300",
-                  b.state === "steady" && "border-gray-200",
-                  b.state === "cool" && "border-gray-200 opacity-80",
-                  sizeClasses(b.size),
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
+                <button
+                  key={b.id}
+                  type="button"
+                  className={[
+                    "rounded-full border bg-white",
+                    "flex flex-col items-center justify-center",
+                    "shadow-sm active:scale-[0.98] transition",
+                    "select-none",
+                    b.state === "hot" && "animate-pulseSoft border-gray-300",
+                    b.state === "steady" && "border-gray-200",
+                    b.state === "cool" && "border-gray-200 opacity-80",
+                    sizeClasses(b.size),
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  aria-label={`${b.label} — ${stateLabel(b.state)}`}
+                  onClick={() => alert(`${b.label} — ${stateLabel(b.state)}`)}
+                >
                   <span className="font-medium leading-tight text-center px-2">
                     {b.label}
                   </span>
