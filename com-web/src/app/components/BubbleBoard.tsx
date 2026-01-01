@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TopicModal, { type TopicDetail } from "@/app/components/TopicModal";
-import TrendChart from "@/app/components/TrendChart";
+import TrendChartSingle from "@/app/components/TrendChartSingle";
 import BubbleParticles from "@/app/components/BubbleParticles";
 
 type Bubble = {
@@ -72,7 +72,6 @@ function makeSeries(mode: "up" | "down") {
 export default function BubbleBoard() {
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
 
-  // tabs/pager
   const [activeIndex, setActiveIndex] = useState(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
@@ -92,16 +91,14 @@ export default function BubbleBoard() {
     if (idx !== activeIndex) setActiveIndex(idx);
   }, [activeIndex]);
 
-  // modal
   const [selected, setSelected] = useState<TopicDetail | null>(null);
 
-  // refs das bolhas em destaque (para partículas)
   const hotRef = useRef<HTMLButtonElement | null>(null);
   const coolRef = useRef<HTMLButtonElement | null>(null);
 
   const activeCat = data[activeIndex];
 
-  const CHANGE_MS = 3800; // velocidade de troca do par
+  const CHANGE_MS = 3800;
   const [pairTick, setPairTick] = useState(0);
 
   useEffect(() => {
@@ -109,18 +106,15 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, []);
 
-  // escolhe hot/cool (apenas 2)
   const { hotBubble, coolBubble } = useMemo(() => {
     const items = activeCat?.items ?? [];
     if (items.length < 2) return { hotBubble: items[0], coolBubble: items[1] };
-
     return {
       hotBubble: items[pairTick % items.length],
       coolBubble: items[(pairTick + 1) % items.length],
     };
   }, [activeCat, pairTick]);
 
-  // atualiza estados/energy (somente hot/cool)
   useEffect(() => {
     if (!activeCat || !hotBubble || !coolBubble) return;
 
@@ -135,7 +129,6 @@ export default function BubbleBoard() {
             items: cat.items.map((b) => {
               if (b.id === hotBubble.id) return { ...b, state: "hot", energy: clamp01(b.energy + 0.014), size: "md" };
               if (b.id === coolBubble.id) return { ...b, state: "cool", energy: clamp01(b.energy - 0.011), size: "sm" };
-
               const baseline = 0.5;
               return { ...b, state: "steady", energy: clamp01(b.energy + (baseline - b.energy) * 0.03) };
             }),
@@ -147,7 +140,6 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, [activeCat, activeIndex, hotBubble?.id, coolBubble?.id]);
 
-  // séries do gráfico (hot/cool)
   const hotSeries = useMemo(() => makeSeries("up"), [pairTick, activeIndex]);
   const coolSeries = useMemo(() => makeSeries("down"), [pairTick, activeIndex]);
 
@@ -188,7 +180,7 @@ export default function BubbleBoard() {
         </div>
       </div>
 
-      {/* Pager horizontal */}
+      {/* Pager */}
       <div
         ref={viewportRef}
         onScroll={onScroll}
@@ -211,8 +203,8 @@ export default function BubbleBoard() {
 
             return (
               <section key={cat.title} className="w-full flex-none snap-center px-5 pb-8" style={{ minHeight: "calc(100dvh - 72px)" }}>
-                <div className="pt-6 flex flex-col gap-5">
-                  {/* 2 bolhas principais */}
+                <div className="pt-6 flex flex-col gap-4">
+                  {/* bolhas grandes */}
                   <div className="flex justify-center gap-5">
                     <button
                       ref={isActive ? hotRef : undefined}
@@ -237,15 +229,27 @@ export default function BubbleBoard() {
                     </button>
                   </div>
 
-                  {/* Gráfico */}
-                  <TrendChart
-                    now={new Date()}
-                    hot={{ name: hot?.label ?? "Quente", points: hotSeries }}
-                    cool={{ name: cool?.label ?? "Frio", points: coolSeries }}
-                    height={200}
-                  />
+                  {/* gráficos independentes (empilhados) */}
+                  <div className="flex flex-col gap-3">
+                    <TrendChartSingle
+                      now={new Date()}
+                      name={hot?.label ?? "Quente"}
+                      direction="up"
+                      color="var(--hot-br)"
+                      points={hotSeries}
+                      height={155}
+                    />
+                    <TrendChartSingle
+                      now={new Date()}
+                      name={cool?.label ?? "Frio"}
+                      direction="down"
+                      color="var(--cool-br)"
+                      points={coolSeries}
+                      height={155}
+                    />
+                  </div>
 
-                  {/* Todas as bolhas menores */}
+                  {/* grid de bolhas */}
                   <div className="pt-1">
                     <div className="flex flex-wrap gap-3 justify-center">
                       {items.map((b) => (
