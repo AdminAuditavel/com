@@ -1,7 +1,6 @@
-
 "use client";
 
-type Point = { t: number; v: number }; // t: minutos (0..10), v: 0..1
+type Point = { t: number; v: number }; // t: minutos (0..15), v: 0..1
 
 function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
@@ -12,7 +11,7 @@ function pointsToPath(points: Point[], w: number, h: number, pad: number, rightP
   const innerW = w - pad - rightPad;
   const innerH = h - pad * 2;
 
-  const toX = (t: number) => pad + (t / 10) * innerW;
+  const toX = (t: number) => pad + (t / 15) * innerW;
   const toY = (v: number) => pad + (1 - clamp01(v)) * innerH;
 
   return points
@@ -40,22 +39,22 @@ export default function TrendChart({
   now?: Date;
 }) {
   const pad = 10;
-  const rightPad = 34; // espaço para labels do eixo Y à direita
+  const rightPad = 34;
 
   const hotPath = pointsToPath(hotSeries, width, height, pad, rightPad);
   const coolPath = pointsToPath(coolSeries, width, height, pad, rightPad);
 
-  // horários: agora, -5, -10
-  const t10 = new Date(now.getTime() - 10 * 60 * 1000);
-  const t5 = new Date(now.getTime() - 5 * 60 * 1000);
+  // horários: agora, -7.5, -15 (arredondando para minutos inteiros)
+  const t15 = new Date(now.getTime() - 15 * 60 * 1000);
+  const t8 = new Date(now.getTime() - 8 * 60 * 1000);
   const t0 = now;
 
   const plotRightX = width - rightPad;
 
   return (
     <div className="w-full">
-      <div className="flex items-baseline justify-between mb-2">
-        <div className="text-xs font-semibold tracking-widest text-gray-700">ÚLTIMOS 10 MIN</div>
+      {/* legenda simples, sem “últimos 10 min” */}
+      <div className="flex items-baseline justify-end mb-2">
         <div className="flex gap-3 text-[11px] text-gray-600">
           <span>
             <span
@@ -74,14 +73,13 @@ export default function TrendChart({
         </div>
       </div>
 
-      {/* Sem contorno (sem border) */}
       <div className="w-full rounded-xl bg-white/70 px-2 py-2">
         <svg
           width="100%"
           height={height}
           viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="none"
-          aria-label="Gráfico dos últimos 10 minutos"
+          aria-label="Gráfico de tendência"
         >
           {/* grid leve */}
           <g opacity="0.75">
@@ -101,7 +99,7 @@ export default function TrendChart({
             })}
           </g>
 
-          {/* eixo Y à direita (0%..100%) */}
+          {/* eixo Y à direita */}
           <g fill="#6b7280" fontSize="10">
             <text x={plotRightX + 6} y={pad + 3}>
               100%
@@ -136,13 +134,13 @@ export default function TrendChart({
             />
           )}
 
-          {/* eixo X com horas */}
+          {/* eixo X com horas (15min) */}
           <g fill="#6b7280" fontSize="10">
             <text x={pad} y={height - 2}>
-              {fmtTime(t10)}
+              {fmtTime(t15)}
             </text>
             <text x={width / 2 - 12} y={height - 2}>
-              {fmtTime(t5)}
+              {fmtTime(t8)}
             </text>
             <text x={plotRightX - 22} y={height - 2}>
               {fmtTime(t0)}
