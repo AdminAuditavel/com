@@ -56,7 +56,9 @@ function sizeClasses(size: Bubble["size"]) {
 export default function BubbleBoard() {
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
 
-  // Lista achatada de ids (recomputada quando data muda)
+  const [selected, setSelected] = useState<TopicDetail | null>(null);
+  const isOpen = !!selected;
+
   const allIds = useMemo(() => {
     return data.flatMap((c) => c.items.map((b) => b.id));
   }, [data]);
@@ -72,11 +74,9 @@ export default function BubbleBoard() {
           items: cat.items.map((b) => {
             if (b.id !== pick) return b;
 
-            // ciclo simples: cool -> steady -> hot -> steady -> cool...
             const nextState: Bubble["state"] =
               b.state === "cool" ? "steady" : b.state === "steady" ? "hot" : "steady";
 
-            // ajuste leve no tamanho para dar sensação de pulso
             const nextSize: Bubble["size"] =
               nextState === "hot"
                 ? b.size === "sm"
@@ -98,48 +98,52 @@ export default function BubbleBoard() {
   }, [allIds]);
 
   return (
-    <section className="px-5 pb-10 space-y-10">
-      {data.map((cat) => (
-        <div key={cat.title}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs font-semibold tracking-widest text-gray-500">
-              {cat.title}
-            </h2>
-          </div>
+    <>
+      <section className="px-5 pb-10 space-y-10">
+        {data.map((cat) => (
+          <div key={cat.title}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xs font-semibold tracking-widest text-gray-500">
+                {cat.title}
+              </h2>
+            </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-            <div className="flex flex-wrap gap-3">
-              {cat.items.map((b) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  className={[
-                    "rounded-full border bg-white",
-                    "flex flex-col items-center justify-center",
-                    "shadow-sm active:scale-[0.98] transition",
-                    "select-none",
-                    b.state === "hot" && "animate-pulseSoft border-gray-300",
-                    b.state === "steady" && "border-gray-200",
-                    b.state === "cool" && "border-gray-200 opacity-80",
-                    sizeClasses(b.size),
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  aria-label={`${b.label} — ${stateLabel(b.state)}`}
-                  onClick={() => alert(`${b.label} — ${stateLabel(b.state)}`)}
-                >
-                  <span className="font-medium leading-tight text-center px-2">
-                    {b.label}
-                  </span>
-                  <span className="mt-1 text-[10px] text-gray-500">
-                    {stateLabel(b.state)}
-                  </span>
-                </button>
-              ))}
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+              <div className="flex flex-wrap gap-3">
+                {cat.items.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    className={[
+                      "rounded-full border bg-white",
+                      "flex flex-col items-center justify-center",
+                      "shadow-sm active:scale-[0.98] transition",
+                      "select-none",
+                      b.state === "hot" && "animate-pulseSoft border-gray-300",
+                      b.state === "steady" && "border-gray-200",
+                      b.state === "cool" && "border-gray-200 opacity-80",
+                      sizeClasses(b.size),
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    aria-label={`${b.label} — ${stateLabel(b.state)}`}
+                    onClick={() => setSelected({ id: b.id, label: b.label, state: b.state })}
+                  >
+                    <span className="font-medium leading-tight text-center px-2">
+                      {b.label}
+                    </span>
+                    <span className="mt-1 text-[10px] text-gray-500">
+                      {stateLabel(b.state)}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
-    </section>
+        ))}
+      </section>
+
+      <TopicModal open={isOpen} topic={selected} onClose={() => setSelected(null)} />
+    </>
   );
 }
