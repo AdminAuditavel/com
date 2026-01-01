@@ -47,24 +47,23 @@ const INITIAL_DATA: CategoryBlock[] = [
 
 type BubblePos = { x: number; y: number }; // percent
 
-// Posições dentro de uma “área segura” (centro da bolha).
-// Mantemos x/y longe das bordas porque a bolha cresce com --inflate.
+// Mais “denso”: cluster central (ainda sem parecer grade)
 const POSITIONS: Record<CategoryBlock["title"], Record<string, BubblePos>> = {
   ESPORTES: {
-    flamengo: { x: 64, y: 30 },
-    palmeiras: { x: 30, y: 28 },
-    corinthians: { x: 48, y: 52 },
-    selecao: { x: 24, y: 66 },
-    ufc: { x: 74, y: 62 },
-    mcgregor: { x: 58, y: 76 },
-    "futebol-mundial": { x: 40, y: 74 },
+    flamengo: { x: 58, y: 38 }, // grande mais central
+    palmeiras: { x: 36, y: 34 },
+    corinthians: { x: 44, y: 56 },
+    selecao: { x: 32, y: 68 },
+    ufc: { x: 68, y: 58 },
+    mcgregor: { x: 58, y: 72 },
+    "futebol-mundial": { x: 46, y: 72 },
   },
   POLÍTICA: {
-    presidencia: { x: 58, y: 32 },
-    stf: { x: 30, y: 42 },
-    congresso: { x: 72, y: 52 },
-    "eleicoes-2026": { x: 40, y: 66 },
-    "gastos-publicos": { x: 60, y: 76 },
+    presidencia: { x: 56, y: 40 },
+    stf: { x: 36, y: 44 },
+    congresso: { x: 70, y: 50 },
+    "eleicoes-2026": { x: 44, y: 66 },
+    "gastos-publicos": { x: 60, y: 70 },
   },
 };
 
@@ -222,11 +221,11 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, [allIds]);
 
-  // “área segura” em percentuais (centro das bolhas)
-  const SAFE_X_MIN = 18;
-  const SAFE_X_MAX = 82;
-  const SAFE_Y_MIN = 16;
-  const SAFE_Y_MAX = 84;
+  // Safe area mais apertada (mais denso)
+  const SAFE_X_MIN = 22;
+  const SAFE_X_MAX = 78;
+  const SAFE_Y_MIN = 20;
+  const SAFE_Y_MAX = 80;
 
   return (
     <>
@@ -267,7 +266,7 @@ export default function BubbleBoard() {
         </div>
       </div>
 
-      {/* Pager */}
+      {/* Pager horizontal */}
       <div
         ref={viewportRef}
         onScroll={onScroll}
@@ -289,67 +288,67 @@ export default function BubbleBoard() {
           {data.map((cat) => (
             <section
               key={cat.title}
-              className="w-full flex-none snap-center px-5 pb-10"
-              style={{ minHeight: "calc(100vh - 72px)" }}
+              className="w-full flex-none snap-center px-5"
+              style={{
+                height: "calc(100vh - 72px)", // uma tela só
+                overflow: "hidden",
+              }}
             >
-              <div className="pt-4">
-                <div
-                  className="relative w-full"
-                  style={{
-                    // altura suficiente pra caber todas (ajuste fino mobile)
-                    height: "calc(100vh - 140px)",
-                    minHeight: 420,
-                    maxHeight: 680,
-                  }}
-                >
-                  {cat.items.map((b) => {
-                    const raw = POSITIONS[cat.title][b.id] ?? { x: 50, y: 50 };
-                    const pos = {
-                      x: clamp(raw.x, SAFE_X_MIN, SAFE_X_MAX),
-                      y: clamp(raw.y, SAFE_Y_MIN, SAFE_Y_MAX),
-                    };
+              {/* Campo denso */}
+              <div
+                className="relative w-full"
+                style={{
+                  height: "calc(100vh - 120px)", // tabs + padding
+                  marginTop: 10,
+                }}
+              >
+                {cat.items.map((b) => {
+                  const raw = POSITIONS[cat.title][b.id] ?? { x: 50, y: 50 };
+                  const pos = {
+                    x: clamp(raw.x, SAFE_X_MIN, SAFE_X_MAX),
+                    y: clamp(raw.y, SAFE_Y_MIN, SAFE_Y_MAX),
+                  };
 
-                    return (
-                      <button
-                        key={b.id}
-                        ref={setBubbleEl(b.id)}
-                        type="button"
-                        className={[
-                          "bubble absolute rounded-full border",
-                          "flex flex-col items-center justify-center",
-                          "shadow-sm active:scale-[0.98] transition",
-                          "select-none overflow-hidden",
-                          b.state === "hot" && "bubble-hot",
-                          b.state === "steady" && "bubble-steady",
-                          b.state === "cool" && "bubble-cool",
-                          b.trend === 1 && "bubble-rise",
-                          b.trend === -1 && "bubble-fall",
-                          sizeClasses(b.size),
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                        style={
-                          {
-                            left: `${pos.x}%`,
-                            top: `${pos.y}%`,
-                            transform: "translate(-50%, -50%)",
-                            ["--e" as any]: b.energy,
-                            ["--t" as any]: b.trend,
-                          } as React.CSSProperties
-                        }
-                        aria-label={`${b.label} — ${stateLabel(b.state)}`}
-                        onClick={() => setSelectedId(b.id)}
-                      >
-                        <span className="relative z-10 font-medium leading-tight text-center px-2">
-                          {b.label}
-                        </span>
-                        <span className="relative z-10 mt-1 text-[10px] text-gray-600">
-                          {stateLabel(b.state)}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                  return (
+                    <button
+                      key={b.id}
+                      ref={setBubbleEl(b.id)}
+                      type="button"
+                      className={[
+                        "bubble absolute rounded-full border",
+                        "flex flex-col items-center justify-center",
+                        "shadow-sm active:scale-[0.98] transition",
+                        "select-none overflow-hidden",
+                        b.state === "hot" && "bubble-hot",
+                        b.state === "steady" && "bubble-steady",
+                        b.state === "cool" && "bubble-cool",
+                        b.trend === 1 && "bubble-rise",
+                        b.trend === -1 && "bubble-fall",
+                        sizeClasses(b.size),
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      style={
+                        {
+                          left: `${pos.x}%`,
+                          top: `${pos.y}%`,
+                          transform: "translate(-50%, -50%)",
+                          ["--e" as any]: b.energy,
+                          ["--t" as any]: b.trend,
+                        } as React.CSSProperties
+                      }
+                      aria-label={`${b.label} — ${stateLabel(b.state)}`}
+                      onClick={() => setSelectedId(b.id)}
+                    >
+                      <span className="relative z-10 font-medium leading-tight text-center px-2">
+                        {b.label}
+                      </span>
+                      <span className="relative z-10 mt-1 text-[10px] text-gray-600">
+                        {stateLabel(b.state)}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </section>
           ))}
