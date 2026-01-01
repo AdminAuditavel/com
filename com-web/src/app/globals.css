@@ -71,69 +71,57 @@ body {
   opacity: 0.9;
 }
 
+/* Comentaram — fluxo global (tela → bolha / bolha → tela) com 2 pontos */
 
-.animate-pulseSoft {
-  animation: pulseSoft 3s ease-in-out infinite;
-}
-
-/* Comentaram — efeito “reactions” (estilo YouTube) */
-
-@keyframes floatUpFade {
+@keyframes flowMove {
   0% {
-    transform: translateY(0) scale(0.9);
+    transform: translate(var(--x0), var(--y0)) scale(0.9);
     opacity: 0;
   }
   10% {
     opacity: 0.85;
   }
   100% {
-    transform: translateY(-52px) scale(1.15);
+    transform: translate(var(--x1), var(--y1)) scale(1.1);
     opacity: 0;
   }
 }
 
-@keyframes driftInFade {
-  0% {
-    transform: translate(var(--dx), var(--dy)) scale(1);
-    opacity: 0;
-  }
-  15% {
-    opacity: 0.8;
-  }
-  100% {
-    transform: translate(0px, 0px) scale(0.7);
-    opacity: 0;
-  }
-}
-
-.reaction-layer {
-  position: absolute;
+/* camada fixa por cima da tela toda */
+.flow-layer {
+  position: fixed;
   inset: 0;
   pointer-events: none;
-  overflow: hidden;
-  border-radius: 9999px;
+  z-index: 60; /* acima das bolhas */
 }
 
-.reaction {
+/* “bolhinha de comentário” (sem coração/like) */
+.flow-particle {
   position: absolute;
-  left: var(--x);
-  bottom: 18px; /* usado no floatUp */
-  font-size: var(--s);
-  line-height: 1;
+  left: 0;
+  top: 0;
+  width: 14px;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: rgba(255, 255, 255, 0.65);
   opacity: 0;
   will-change: transform, opacity;
-  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.08));
+  animation: flowMove var(--dur) ease-in-out forwards;
 }
 
-/* “saindo”: sobe e some */
-.reaction--out {
-  animation: floatUpFade var(--dur) ease-out forwards;
+/* “rabinho” do balão */
+.flow-particle::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  bottom: -3px;
+  width: 6px;
+  height: 6px;
+  border-left: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(35deg);
+  background: rgba(255, 255, 255, 0.65);
+  border-bottom-left-radius: 2px;
 }
 
-/* “entrando”: vem de fora para o centro e some */
-.reaction--in {
-  top: 50%;
-  left: 50%;
-  transform: translate(var(--dx), var(--dy));
-  animation: driftInFade var(--dur) ease-in-out forwards;
-}
