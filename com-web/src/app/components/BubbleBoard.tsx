@@ -11,7 +11,7 @@ type Bubble = {
   label: string;
   state: "hot" | "steady" | "cool";
   size: "lg" | "md" | "sm";
-  energy: number; // 0..1
+  energy: number;
   trend: -1 | 0 | 1;
 };
 
@@ -112,7 +112,6 @@ export default function BubbleBoard() {
 
   const activeCat = data[activeIndex];
 
-  // apenas targets da categoria ativa
   const activeHotIds = useMemo(() => {
     if (!activeCat) return [];
     return activeCat.items.filter((b) => b.state === "hot").map((b) => b.id);
@@ -141,9 +140,9 @@ export default function BubbleBoard() {
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  // Simulação contínua (mantém vida). Se você já tem onImpact no FlowLayer, pode remover depois.
   const allIds = useMemo(() => data.flatMap((c) => c.items.map((b) => b.id)), [data]);
 
+  // simulação viva
   useEffect(() => {
     const t = window.setInterval(() => {
       const pick = allIds[Math.floor(Math.random() * allIds.length)];
@@ -196,7 +195,7 @@ export default function BubbleBoard() {
         coolIds={activeCoolIds}
       />
 
-      {/* Tabs (sem mensagem extra) */}
+      {/* Tabs */}
       <div className="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-gray-100">
         <div className="px-5 py-3">
           <div className="flex gap-2">
@@ -246,12 +245,19 @@ export default function BubbleBoard() {
           {data.map((cat) => (
             <section
               key={cat.title}
-              className="w-full flex-none snap-center px-5 pb-10"
-              style={{ minHeight: "calc(100vh - 72px)" }}
+              className="w-full flex-none snap-center px-5"
+              style={{ minHeight: "calc(100dvh - 72px)" }}
             >
-              {/* Sem “quadrado/card”: só o campo limpo */}
-              <div className="pt-6">
-                <div className="flex flex-wrap gap-3">
+              {/* Campo que ocupa a tela e espalha as bolhas */}
+              <div
+                className="w-full flex"
+                style={{
+                  minHeight: "calc(100dvh - 120px)", // ocupa quase a tela toda (menos tabs)
+                  paddingTop: 18,
+                  paddingBottom: 18,
+                }}
+              >
+                <div className="w-full flex flex-wrap justify-center content-center gap-4">
                   {cat.items.map((b) => (
                     <button
                       key={b.id}
