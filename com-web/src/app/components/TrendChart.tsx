@@ -36,8 +36,7 @@ function yAt(v: number, h: number, pad: number) {
   return pad + (1 - clamp01(v)) * innerH;
 }
 
-// Percentual “impactante”
-function boostedPercent(points: Point[], boost = 1.6) {
+function boostedPercent(points: Point[], boost = 1.9) {
   if (points.length < 2) return 0;
   const first = clamp01(points[0]!.v);
   const last = clamp01(points[points.length - 1]!.v);
@@ -73,13 +72,11 @@ export default function TrendChart({
   const hotPct = boostedPercent(hot.points, 1.9);
   const coolPct = boostedPercent(cool.points, 1.9);
 
-  const hotX = xAt(15, width, pad);
-  const coolX = xAt(15, width, pad);
   const hotY = yAt(hotLast, height, pad);
   const coolY = yAt(coolLast, height, pad);
 
-  // evitar overlap dos labels quando ficam muito perto
-  const tooClose = Math.abs(hotY - coolY) < 34;
+  // evitar overlap dos labels
+  const tooClose = Math.abs(hotY - coolY) < 36;
   const hotDY = tooClose && hotY <= coolY ? -18 : 0;
   const coolDY = tooClose && coolY < hotY ? 18 : 0;
 
@@ -88,6 +85,11 @@ export default function TrendChart({
   const t10 = new Date(now.getTime() - 10 * 60 * 1000);
   const t5 = new Date(now.getTime() - 5 * 60 * 1000);
   const t0 = now;
+
+  // label box (posição “no final”)
+  const labelW = 118;
+  const labelH = 36;
+  const labelX = width - pad - labelW; // encosta à direita dentro do plot
 
   return (
     <div className="w-full">
@@ -122,29 +124,32 @@ export default function TrendChart({
           <path d={hotPath} fill="none" stroke="var(--hot-br)" strokeWidth="2.2" />
 
           {/* pontos finais */}
-          <circle cx={width - pad} cy={coolY} r="3.6" fill="var(--cool-br)" />
-          <circle cx={width - pad} cy={hotY} r="3.6" fill="var(--hot-br)" />
+          <circle cx={xAt(15, width, pad)} cy={coolY} r="3.6" fill="var(--cool-br)" />
+          <circle cx={xAt(15, width, pad)} cy={hotY} r="3.6" fill="var(--hot-br)" />
 
-          {/* Labels SOBRE o gráfico (dentro da área), com fundo para legibilidade */}
+          {/* Labels no final, com cor correspondente */}
           {/* HOT */}
-          <g transform={`translate(${hotX - 138}, ${hotY + hotDY - 20})`}>
-            <rect x={0} y={0} width={134} height={34} rx={8} fill="rgba(255,255,255,0.78)" />
+          <g transform={`translate(${labelX}, ${hotY + hotDY - labelH / 2})`}>
+            <rect x={0} y={0} width={labelW} height={labelH} rx={9} fill="rgba(255,255,255,0.85)" />
+            {/* barra/acento na cor da linha */}
+            <rect x={0} y={0} width={4} height={labelH} rx={9} fill="var(--hot-br)" />
             <text x={10} y={14} fontSize="10" fill="#374151">
               {hot.name}
             </text>
-            <text x={10} y={29} fontSize="12" fill="#111827" fontWeight={700}>
+            <text x={10} y={29} fontSize="12" fill="var(--hot-br)" fontWeight={800}>
               {arrow("up")}
               {hotPct}%
             </text>
           </g>
 
           {/* COOL */}
-          <g transform={`translate(${coolX - 138}, ${coolY + coolDY - 20})`}>
-            <rect x={0} y={0} width={134} height={34} rx={8} fill="rgba(255,255,255,0.78)" />
+          <g transform={`translate(${labelX}, ${coolY + coolDY - labelH / 2})`}>
+            <rect x={0} y={0} width={labelW} height={labelH} rx={9} fill="rgba(255,255,255,0.85)" />
+            <rect x={0} y={0} width={4} height={labelH} rx={9} fill="var(--cool-br)" />
             <text x={10} y={14} fontSize="10" fill="#374151">
               {cool.name}
             </text>
-            <text x={10} y={29} fontSize="12" fill="#111827" fontWeight={700}>
+            <text x={10} y={29} fontSize="12" fill="var(--cool-br)" fontWeight={800}>
               {arrow("down")}
               {coolPct}%
             </text>
