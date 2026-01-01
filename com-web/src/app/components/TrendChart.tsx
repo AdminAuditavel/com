@@ -76,16 +76,11 @@ export default function TrendChart({
   const t5 = new Date(now.getTime() - 5 * 60 * 1000);
   const t0 = now;
 
-  // “final do gráfico” (borda direita do plot)
-  const endX = xAt(15, width, pad);
-
-  // cards alinhados à direita (X fixo)
+  // cards alinhados à direita (X fixo), Y segue o ponto final
   const cardW = 128;
   const cardH = 38;
   const cardX = width - pad - cardW;
 
-  // Y segue o ponto, mas sem empurrar para gerar linhas “voltando”:
-  // só um ajuste pequeno anti-overlap (mantém sensação de final)
   const minY = pad + cardH / 2;
   const maxY = height - pad - 14 - cardH / 2;
 
@@ -94,7 +89,6 @@ export default function TrendChart({
 
   const overlap = Math.abs(hotY - coolY) < cardH + 6;
   if (overlap) {
-    // empurra minimamente, mas não “teleporta”
     if (hotY <= coolY) {
       hotY = Math.max(minY, hotY - 10);
       coolY = Math.min(maxY, coolY + 10);
@@ -104,14 +98,13 @@ export default function TrendChart({
     }
   }
 
-  // marcador “tick” curto no final (não atravessa o gráfico)
-  const tickH = 14;
+  const endX = xAt(15, width, pad);
 
   return (
     <div className="w-full">
       <div className="w-full rounded-xl bg-white/70 px-2 py-2">
         <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-          {/* grid leve */}
+          {/* grid horizontal leve */}
           <g opacity="0.75">
             {[0.2, 0.5, 0.8].map((v) => {
               const y = yAt(v, height, pad);
@@ -123,33 +116,11 @@ export default function TrendChart({
           <path d={coolPath} fill="none" stroke="var(--cool-br)" strokeWidth="2.2" />
           <path d={hotPath} fill="none" stroke="var(--hot-br)" strokeWidth="2.2" />
 
-          {/* ticks curtos no final (ancora visual) */}
-          <line
-            x1={endX}
-            y1={hotY0 - tickH / 2}
-            x2={endX}
-            y2={hotY0 + tickH / 2}
-            stroke="var(--hot-br)"
-            strokeWidth="4"
-            strokeLinecap="round"
-            opacity="0.85"
-          />
-          <line
-            x1={endX}
-            y1={coolY0 - tickH / 2}
-            x2={endX}
-            y2={coolY0 + tickH / 2}
-            stroke="var(--cool-br)"
-            strokeWidth="4"
-            strokeLinecap="round"
-            opacity="0.85"
-          />
-
           {/* pontos finais */}
           <circle cx={endX} cy={coolY0} r="3.6" fill="var(--cool-br)" />
           <circle cx={endX} cy={hotY0} r="3.6" fill="var(--hot-br)" />
 
-          {/* cards colados à direita (sem leader line) */}
+          {/* HOT card */}
           <g transform={`translate(${cardX}, ${hotY - cardH / 2})`}>
             <rect x={0} y={0} width={cardW} height={cardH} rx={10} fill="rgba(255,255,255,0.92)" />
             <rect x={0} y={0} width={4} height={cardH} rx={10} fill="var(--hot-br)" />
@@ -161,6 +132,7 @@ export default function TrendChart({
             </text>
           </g>
 
+          {/* COOL card */}
           <g transform={`translate(${cardX}, ${coolY - cardH / 2})`}>
             <rect x={0} y={0} width={cardW} height={cardH} rx={10} fill="rgba(255,255,255,0.92)" />
             <rect x={0} y={0} width={4} height={cardH} rx={10} fill="var(--cool-br)" />
