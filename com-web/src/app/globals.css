@@ -27,10 +27,19 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Mobile: levemente menor para permitir “campo denso” */
+@media (max-width: 420px) {
+  .bubble.w-36 {
+    width: 8.6rem;  /* ~138px */
+    height: 8.6rem;
+  }
+  .bubble.w-28 {
+    width: 6.7rem;  /* ~107px */
+    height: 6.7rem;
+  }
+  .bubble.w-22 {
+    width: 5.2rem;  /* ~83px */
+    height: 5.2rem;
   }
 }
 
