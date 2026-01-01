@@ -1,7 +1,7 @@
 "use client";
 
 type Point = { t: number; v: number }; // t: minutos (0..15), v: 0..1
-type Series = { name: string; color: string; dir: "up" | "down" | "steady"; points: Point[] };
+type Dir = "up" | "down";
 
 function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
@@ -26,85 +26,65 @@ function fmtTime(d: Date) {
   return `${hh}:${mm}`;
 }
 
-function pctFromSeries(points: Point[]) {
-  // “percentual” visual baseado em 0..1 => 0..100
-  const last = points[points.length - 1]?.v ?? 0;
-  return Math.round(clamp01(last) * 100);
+// Percentual “mais impactante”:
+// usa variação absoluta no período e amplifica um pouco.
+// Depois, clamp 0..100.
+function boostedPercent(points: Point[], boost = 1.35) {
+  if (points.length < 2) return 0;
+  const first = clamp01(points[0]!.v);
+  const last = clamp01(points[points.length - 1]!.v);
+
+  const delta = Math.abs(last - first); // 0..1
+  return Math.max(0, Math.min(100, Math.round(delta * 100 * boost)));
 }
 
-function arrow(dir: Series["dir"]) {
-  if (dir === "up") return "↑";
-  if (dir === "down") return "↓";
-  return "•";
+function arrow(dir: Dir) {
+  return dir === "up" ? "↑" : "↓";
 }
 
 export default function TrendChart({
   hot,
   cool,
-  steady,
   width = 340,
-  height = 140,
+  height = 180,
   now = new Date(),
 }: {
   hot: { name: string; points: Point[] };
   cool: { name: string; points: Point[] };
-  steady: { name: string; points: Point[] };
   width?: number;
   height?: number;
   now?: Date;
 }) {
   const pad = 10;
-  const rightPad = 78; // espaço para labels na ponta direita
 
+  // espaço para labels à direita (2 linhas)
+  const rightPad = 110;
   const plotRightX = width - rightPad;
 
-  const series: Series[] = [
-    { name: hot.name, color: "var(--hot-br)", dir: "up", points: hot.points },
-    { name: cool.name, color: "var(--cool-br)", dir: "down", points: cool.points },
-    { name: steady.name, color: "var(--steady-br, #6b7280)", dir: "steady", points: steady.points },
-  ];
+  const innerW = plotRightX - pad;
+  const xAt = (minutes: number) => pad + (minutes / 15) * innerW;
+  const yAt = (v: number) => pad + (1 - clamp01(v)) * (height - pad * 2);
 
-  const paths = series.map((s) => ({
-    ...s,
-    path: pointsToPath(s.points, width, height, pad, rightPad),
-    pct: pctFromSeries(s.points),
-    lastV: s.points[s.points.length - 1]?.v ?? 0.5,
-  }));
+  const hotPath = pointsToPath(hot.points, width, height, pad, rightPad);
+  const coolPath = pointsToPath(cool.points, width, height, pad, rightPad);
 
-  // 4 tempos no eixo X: -15, -10, -5, agora
+  const hotLast = hot.points[hot.points.length - 1]?.v ?? 0.5;
+  const coolLast = cool.points[cool.points.length - 1]?.v ?? 0.5;
+
+  const hotPct = boostedPercent(hot.points, 1.6);
+  const coolPct = boostedPercent(cool.points, 1.6);
+
+  // Eixo X: 4 tempos (-15, -10, -5, agora)
   const t15 = new Date(now.getTime() - 15 * 60 * 1000);
   const t10 = new Date(now.getTime() - 10 * 60 * 1000);
   const t5 = new Date(now.getTime() - 5 * 60 * 1000);
   const t0 = now;
 
-  const innerW = plotRightX - pad;
-  const xAt = (minutes: number) => pad + (minutes / 15) * innerW;
-
-  const yAt = (v: number) => pad + (1 - clamp01(v)) * (height - pad * 2);
-
   return (
     <div className="w-full">
-      {/* legenda curta */}
-      <div className="flex items-baseline justify-end mb-2">
-        <div className="flex gap-3 text-[11px] text-gray-600">
-          <span>
-            <span className="inline-block w-2 h-2 rounded-full mr-1 align-middle" style={{ background: "var(--hot-br)" }} />
-            quente
-          </span>
-          <span>
-            <span className="inline-block w-2 h-2 rounded-full mr-1 align-middle" style={{ background: "var(--cool-br)" }} />
-            frio
-          </span>
-          <span>
-            <span className="inline-block w-2 h-2 rounded-full mr-1 align-middle" style={{ background: "var(--steady-br, #6b7280)" }} />
-            estável
-          </span>
-        </div>
-      </div>
-
       <div className="w-full rounded-xl bg-white/70 px-2 py-2">
         <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-          {/* grid leve horizontal (sem eixo Y) */}
+          {/* grid leve horizontal */}
           <g opacity="0.75">
             {[0.2, 0.5, 0.8].map((v) => {
               const y = yAt(v);
@@ -113,32 +93,51 @@ export default function TrendChart({
           </g>
 
           {/* linhas */}
-          {paths.map((s) => (
-            <path key={s.name} d={s.path} fill="none" stroke={s.color} strokeWidth="2.2" />
-          ))}
+          <path d={coolPath} fill="none" stroke="var(--cool-br)" strokeWidth="2.2" />
+          <path d={hotPath} fill="none" stroke="var(--hot-br)" strokeWidth="2.2" />
 
-          {/* pontos finais + labels na ponta */}
-          {paths.map((s, idx) => {
-            const cy = yAt(s.lastV);
-            const cx = plotRightX;
+          {/* pontos finais */}
+          <circle cx={plotRightX} cy={yAt(coolLast)} r="3.5" fill="var(--cool-br)" />
+          <circle cx={plotRightX} cy={yAt(hotLast)} r="3.5" fill="var(--hot-br)" />
 
-            // pequeno offset vertical para evitar que 3 labels se sobreponham quando os valores estão próximos
-            const labelYOffset = (idx - 1) * 12;
+          {/* labels à direita: Nome em cima, percentual embaixo (negrito) */}
+          {(() => {
+            const cx = plotRightX + 10;
+
+            // offsets para evitar sobreposição quando hot/cool ficarem muito perto
+            const hotY = yAt(hotLast);
+            const coolY = yAt(coolLast);
+            const tooClose = Math.abs(hotY - coolY) < 32;
+
+            const hotOffset = tooClose && hotY <= coolY ? -16 : 0;
+            const coolOffset = tooClose && coolY < hotY ? 16 : 0;
 
             return (
-              <g key={`${s.name}-end`}>
-                <circle cx={cx} cy={cy} r="3.5" fill={s.color} />
-                <text
-                  x={cx + 8}
-                  y={cy + 4 + labelYOffset}
-                  fontSize="10"
-                  fill="#374151"
-                >
-                  {arrow(s.dir)} {s.pct}% {s.name}
-                </text>
-              </g>
+              <>
+                {/* HOT */}
+                <g transform={`translate(${cx}, ${hotY + hotOffset})`}>
+                  <text x={0} y={-6} fontSize="10" fill="#374151">
+                    {hot.name}
+                  </text>
+                  <text x={0} y={10} fontSize="12" fill="#111827" fontWeight={700}>
+                    {arrow("up")}
+                    {hotPct}%
+                  </text>
+                </g>
+
+                {/* COOL */}
+                <g transform={`translate(${cx}, ${coolY + coolOffset})`}>
+                  <text x={0} y={-6} fontSize="10" fill="#374151">
+                    {cool.name}
+                  </text>
+                  <text x={0} y={10} fontSize="12" fill="#111827" fontWeight={700}>
+                    {arrow("down")}
+                    {coolPct}%
+                  </text>
+                </g>
+              </>
             );
-          })}
+          })()}
 
           {/* eixo X com 4 horas */}
           <g fill="#6b7280" fontSize="10">
