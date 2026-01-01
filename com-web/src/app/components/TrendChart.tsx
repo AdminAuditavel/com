@@ -70,13 +70,11 @@ export default function TrendChart({
   const hotPct = boostedPercent(hot.points, 2.4);
   const coolPct = boostedPercent(cool.points, 2.4);
 
-  // eixo X 4 tempos
   const t15 = new Date(now.getTime() - 15 * 60 * 1000);
   const t10 = new Date(now.getTime() - 10 * 60 * 1000);
   const t5 = new Date(now.getTime() - 5 * 60 * 1000);
   const t0 = now;
 
-  // cards alinhados à direita (X fixo), Y segue o ponto final
   const cardW = 128;
   const cardH = 38;
   const cardX = width - pad - cardW;
@@ -104,7 +102,6 @@ export default function TrendChart({
     <div className="w-full">
       <div className="w-full rounded-xl bg-white/70 px-2 py-2">
         <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-          {/* grid horizontal leve */}
           <g opacity="0.75">
             {[0.2, 0.5, 0.8].map((v) => {
               const y = yAt(v, height, pad);
@@ -112,18 +109,15 @@ export default function TrendChart({
             })}
           </g>
 
-          {/* linhas */}
           <path d={coolPath} fill="none" stroke="var(--cool-br)" strokeWidth="2.2" />
           <path d={hotPath} fill="none" stroke="var(--hot-br)" strokeWidth="2.2" />
 
-          {/* pontos finais */}
           <circle cx={endX} cy={coolY0} r="3.6" fill="var(--cool-br)" />
           <circle cx={endX} cy={hotY0} r="3.6" fill="var(--hot-br)" />
 
-          {/* HOT card */}
+          {/* HOT card (sem barrinha) */}
           <g transform={`translate(${cardX}, ${hotY - cardH / 2})`}>
             <rect x={0} y={0} width={cardW} height={cardH} rx={10} fill="rgba(255,255,255,0.92)" />
-            <rect x={0} y={0} width={4} height={cardH} rx={10} fill="var(--hot-br)" />
             <text x={10} y={15} fontSize="10" fill="#374151">
               {hot.name}
             </text>
@@ -132,10 +126,9 @@ export default function TrendChart({
             </text>
           </g>
 
-          {/* COOL card */}
+          {/* COOL card (sem barrinha) */}
           <g transform={`translate(${cardX}, ${coolY - cardH / 2})`}>
             <rect x={0} y={0} width={cardW} height={cardH} rx={10} fill="rgba(255,255,255,0.92)" />
-            <rect x={0} y={0} width={4} height={cardH} rx={10} fill="var(--cool-br)" />
             <text x={10} y={15} fontSize="10" fill="#374151">
               {cool.name}
             </text>
@@ -144,7 +137,6 @@ export default function TrendChart({
             </text>
           </g>
 
-          {/* eixo X com 4 horários */}
           <g fill="#6b7280" fontSize="10">
             <text x={xAt(0, width, pad)} y={height - 2}>
               {fmtTime(t15)}
