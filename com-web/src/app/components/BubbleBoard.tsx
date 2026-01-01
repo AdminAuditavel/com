@@ -186,8 +186,11 @@ export default function BubbleBoard() {
               </h2>
             </div>
 
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+            <div className="py-3 border-t border-gray-100">
               <div className="flex flex-wrap gap-3">
+                {cat.items.map(...)}
+              </div>
+            </div>
                 {cat.items.map((b) => (
                   <button
                     key={b.id}
