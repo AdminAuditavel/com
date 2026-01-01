@@ -124,24 +124,24 @@ const selected = useMemo<TopicDetail | null>(() => {
                     key={b.id}
                     type="button"
                     className={[
-                    "rounded-full border",
-                    "flex flex-col items-center justify-center",
-                    "shadow-sm active:scale-[0.98] transition",
-                    "select-none",
-                    b.state === "hot" && "bubble-hot animate-pulseSoft",
-                    b.state === "steady" && "bubble-steady",
-                    b.state === "cool" && "bubble-cool",
-                    sizeClasses(b.size),
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
+                      "bubble rounded-full border",
+                      "flex flex-col items-center justify-center",
+                      "shadow-sm active:scale-[0.98] transition",
+                      "select-none",
+                      b.state === "hot" && "bubble-hot animate-pulseSoft",
+                      b.state === "steady" && "bubble-steady",
+                      b.state === "cool" && "bubble-cool",
+                      sizeClasses(b.size),
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                     aria-label={`${b.label} — ${stateLabel(b.state)}`}
                     onClick={() => setSelectedId(b.id)}
                   >
-                    <span className="font-medium leading-tight text-center px-2">
+                    <span className="relative z-10 font-medium leading-tight text-center px-2">
                       {b.label}
                     </span>
-                    <span className="mt-1 text-[10px] text-gray-500">
+                    <span className="relative z-10 mt-1 text-[10px] text-gray-500">
                       {stateLabel(b.state)}
                     </span>
                   </button>
