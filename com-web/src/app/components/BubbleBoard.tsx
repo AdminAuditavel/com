@@ -57,12 +57,19 @@ function asDetail(b: Bubble): TopicDetail {
   return { id: b.id, label: b.label, state: b.state };
 }
 
-function makeSeries(up: boolean) {
-  // 15 pontos (0..15)
+function makeSeries(mode: "up" | "down" | "steady") {
   const pts: { t: number; v: number }[] = [];
-  let v = up ? 0.35 : 0.7;
+  let v = mode === "up" ? 0.35 : mode === "down" ? 0.7 : 0.52;
+
   for (let i = 0; i <= 15; i++) {
-    v = clamp01(v + (up ? 0.02 : -0.02) + (Math.random() * 0.06 - 0.03));
+    const drift =
+      mode === "up" ? 0.018 : mode === "down" ? -0.018 : 0.0;
+
+    v = clamp01(v + drift + (Math.random() * 0.06 - 0.03));
+
+    // mantém “steady” mais contido
+    if (mode === "steady") v = clamp01(v + (0.52 - v) * 0.25);
+
     pts.push({ t: i, v });
   }
   return pts;
@@ -94,15 +101,15 @@ export default function BubbleBoard() {
   // modal
   const [selected, setSelected] = useState<TopicDetail | null>(null);
 
-  // refs das bolhas em destaque
+  // refs das bolhas em destaque (hot/cool para partículas)
   const hotRef = useRef<HTMLButtonElement | null>(null);
   const coolRef = useRef<HTMLButtonElement | null>(null);
 
   const activeCat = data[activeIndex];
 
-  const CHANGE_MS = 3800; // mais lento (ajuste fino aqui)
-
+  const CHANGE_MS = 3800;
   const [pairTick, setPairTick] = useState(0);
+
   useEffect(() => {
     const t = window.setInterval(() => setPairTick((x) => x + 1), CHANGE_MS);
     return () => window.clearInterval(t);
@@ -110,16 +117,13 @@ export default function BubbleBoard() {
 
   const { hotBubble, coolBubble, steadyBubble } = useMemo(() => {
     const items = activeCat?.items ?? [];
-    if (items.length < 3) {
-      return { hotBubble: items[0], coolBubble: items[1], steadyBubble: items[2] };
-    }
+    if (items.length < 3) return { hotBubble: items[0], coolBubble: items[1], steadyBubble: items[2] };
 
-    const hot = items[pairTick % items.length];
-    const cool = items[(pairTick + 1) % items.length];
-    // escolhe uma terceira diferente (a próxima)
-    const steady = items[(pairTick + 2) % items.length];
-
-    return { hotBubble: hot, coolBubble: cool, steadyBubble: steady };
+    return {
+      hotBubble: items[pairTick % items.length],
+      coolBubble: items[(pairTick + 1) % items.length],
+      steadyBubble: items[(pairTick + 2) % items.length],
+    };
   }, [activeCat, pairTick]);
 
   useEffect(() => {
@@ -149,13 +153,8 @@ export default function BubbleBoard() {
                   size: "sm",
                 };
               }
-
               const baseline = 0.5;
-              return {
-                ...b,
-                state: "steady",
-                energy: clamp01(b.energy + (baseline - b.energy) * 0.03),
-              };
+              return { ...b, state: "steady", energy: clamp01(b.energy + (baseline - b.energy) * 0.03) };
             }),
           };
         })
@@ -165,26 +164,18 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, [activeCat, activeIndex, hotBubble?.id, coolBubble?.id, steadyBubble?.id]);
 
-  const hotSeries = useMemo(() => makeSeries(true), [pairTick, activeIndex]);
-  const coolSeries = useMemo(() => makeSeries(false), [pairTick, activeIndex]);
+  // séries mudam junto com o par (para o label mostrar o nome certo)
+  const hotSeries = useMemo(() => makeSeries("up"), [pairTick, activeIndex]);
+  const coolSeries = useMemo(() => makeSeries("down"), [pairTick, activeIndex]);
+  const steadySeries = useMemo(() => makeSeries("steady"), [pairTick, activeIndex]);
 
   const getHotRect = useCallback(() => hotRef.current?.getBoundingClientRect() ?? null, []);
   const getCoolRect = useCallback(() => coolRef.current?.getBoundingClientRect() ?? null, []);
 
   return (
     <>
-      <BubbleParticles
-        active={!!hotBubble}
-        direction="up"
-        colorVar="var(--hot-br)"
-        getSourceRect={getHotRect}
-      />
-      <BubbleParticles
-        active={!!coolBubble}
-        direction="down"
-        colorVar="var(--cool-br)"
-        getSourceRect={getCoolRect}
-      />
+      <BubbleParticles active={!!hotBubble} direction="up" colorVar="var(--hot-br)" getSourceRect={getHotRect} />
+      <BubbleParticles active={!!coolBubble} direction="down" colorVar="var(--cool-br)" getSourceRect={getCoolRect} />
 
       {/* Tabs */}
       <div className="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-gray-100">
@@ -203,9 +194,7 @@ export default function BubbleBoard() {
                   className={[
                     "px-3 py-2 rounded-full text-xs font-semibold tracking-widest",
                     "transition border",
-                    active
-                      ? "bg-gray-900 text-white border-gray-900"
-                      : "bg-white text-gray-600 border-gray-200",
+                    active ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200",
                   ].join(" ")}
                   aria-current={active ? "page" : undefined}
                 >
@@ -245,28 +234,18 @@ export default function BubbleBoard() {
             const steady = isActive ? steadyBubble : items[2];
 
             return (
-              <section
-                key={cat.title}
-                className="w-full flex-none snap-center px-5 pb-8"
-                style={{ minHeight: "calc(100dvh - 72px)" }}
-              >
+              <section key={cat.title} className="w-full flex-none snap-center px-5 pb-8" style={{ minHeight: "calc(100dvh - 72px)" }}>
                 <div className="pt-6 flex flex-col gap-5">
-                  {/* 3 bolhas principais (menores) */}
+                  {/* 3 bolhas principais */}
                   <div className="flex justify-center gap-4">
                     <button
                       ref={isActive ? hotRef : undefined}
                       type="button"
                       onClick={() => hot && setSelected(asDetail(hot))}
-                      className={[
-                        "bubble bubble-hot rounded-full border overflow-hidden",
-                        "flex flex-col items-center justify-center",
-                        "w-24 h-24",
-                      ].join(" ")}
+                      className="bubble bubble-hot rounded-full border overflow-hidden flex flex-col items-center justify-center w-24 h-24"
                       style={{ ["--e" as any]: hot?.energy ?? 0.6 }}
                     >
-                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">
-                        {hot?.label ?? "—"}
-                      </div>
+                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">{hot?.label ?? "—"}</div>
                       <div className="text-[10px] text-gray-600 mt-1">Quente</div>
                     </button>
 
@@ -274,38 +253,32 @@ export default function BubbleBoard() {
                       ref={isActive ? coolRef : undefined}
                       type="button"
                       onClick={() => cool && setSelected(asDetail(cool))}
-                      className={[
-                        "bubble bubble-cool rounded-full border overflow-hidden",
-                        "flex flex-col items-center justify-center",
-                        "w-24 h-24",
-                      ].join(" ")}
+                      className="bubble bubble-cool rounded-full border overflow-hidden flex flex-col items-center justify-center w-24 h-24"
                       style={{ ["--e" as any]: cool?.energy ?? 0.4 }}
                     >
-                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">
-                        {cool?.label ?? "—"}
-                      </div>
+                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">{cool?.label ?? "—"}</div>
                       <div className="text-[10px] text-gray-600 mt-1">Frio</div>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => steady && setSelected(asDetail(steady))}
-                      className={[
-                        "bubble bubble-steady rounded-full border overflow-hidden",
-                        "flex flex-col items-center justify-center",
-                        "w-24 h-24",
-                      ].join(" ")}
+                      className="bubble bubble-steady rounded-full border overflow-hidden flex flex-col items-center justify-center w-24 h-24"
                       style={{ ["--e" as any]: steady?.energy ?? 0.5 }}
                     >
-                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">
-                        {steady?.label ?? "—"}
-                      </div>
+                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">{steady?.label ?? "—"}</div>
                       <div className="text-[10px] text-gray-600 mt-1">Estável</div>
                     </button>
                   </div>
 
-                  {/* Gráfico 15 min (2 linhas) */}
-                  <TrendChart hotSeries={hotSeries} coolSeries={coolSeries} now={new Date()} />
+                  {/* Gráfico 15 min com 3 linhas e labels na ponta */}
+                  <TrendChart
+                    now={new Date()}
+                    hot={{ name: hot?.label ?? "Quente", points: hotSeries }}
+                    cool={{ name: cool?.label ?? "Frio", points: coolSeries }}
+                    steady={{ name: steady?.label ?? "Estável", points: steadySeries }}
+                    height={140}
+                  />
 
                   {/* Todas as bolhas menores */}
                   <div className="pt-1">
@@ -316,8 +289,7 @@ export default function BubbleBoard() {
                           type="button"
                           onClick={() => setSelected(asDetail(b))}
                           className={[
-                            "bubble rounded-full border overflow-hidden",
-                            "flex flex-col items-center justify-center",
+                            "bubble rounded-full border overflow-hidden flex flex-col items-center justify-center",
                             b.state === "hot" && "bubble-hot",
                             b.state === "cool" && "bubble-cool",
                             b.state === "steady" && "bubble-steady",
@@ -327,9 +299,7 @@ export default function BubbleBoard() {
                             .join(" ")}
                           style={{ ["--e" as any]: b.energy }}
                         >
-                          <div className="text-[11px] font-medium px-2 text-center leading-tight">
-                            {b.label}
-                          </div>
+                          <div className="text-[11px] font-medium px-2 text-center leading-tight">{b.label}</div>
                         </button>
                       ))}
                     </div>
