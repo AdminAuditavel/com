@@ -11,7 +11,7 @@ type Bubble = {
   label: string;
   state: "hot" | "steady" | "cool";
   size: "lg" | "md" | "sm";
-  energy: number; // 0..1 (volume)
+  energy: number;
   trend: -1 | 0 | 1;
 };
 
@@ -46,27 +46,34 @@ const INITIAL_DATA: CategoryBlock[] = [
 ];
 
 type BubblePos = { x: number; y: number }; // percent
+
+// Posições dentro de uma “área segura” (centro da bolha).
+// Mantemos x/y longe das bordas porque a bolha cresce com --inflate.
 const POSITIONS: Record<CategoryBlock["title"], Record<string, BubblePos>> = {
   ESPORTES: {
-    flamengo: { x: 66, y: 30 },
-    palmeiras: { x: 30, y: 26 },
-    corinthians: { x: 46, y: 52 },
-    selecao: { x: 20, y: 60 },
-    ufc: { x: 74, y: 58 },
-    mcgregor: { x: 58, y: 74 },
+    flamengo: { x: 64, y: 30 },
+    palmeiras: { x: 30, y: 28 },
+    corinthians: { x: 48, y: 52 },
+    selecao: { x: 24, y: 66 },
+    ufc: { x: 74, y: 62 },
+    mcgregor: { x: 58, y: 76 },
     "futebol-mundial": { x: 40, y: 74 },
   },
   POLÍTICA: {
     presidencia: { x: 58, y: 32 },
-    stf: { x: 30, y: 40 },
-    congresso: { x: 72, y: 50 },
-    "eleicoes-2026": { x: 40, y: 62 },
-    "gastos-publicos": { x: 58, y: 74 },
+    stf: { x: 30, y: 42 },
+    congresso: { x: 72, y: 52 },
+    "eleicoes-2026": { x: 40, y: 66 },
+    "gastos-publicos": { x: 60, y: 76 },
   },
 };
 
 function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
+}
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
 }
 
 function stateLabel(s: Bubble["state"]) {
@@ -84,7 +91,6 @@ function sizeClasses(size: Bubble["size"]) {
 export default function BubbleBoard() {
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
 
-  // pager
   const [activeIndex, setActiveIndex] = useState(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
@@ -104,7 +110,7 @@ export default function BubbleBoard() {
     if (idx !== activeIndex) setActiveIndex(idx);
   }, [activeIndex]);
 
-  // refs dos botões (DOMRect)
+  // refs para DOMRect
   const bubbleElsRef = useRef(new Map<string, HTMLButtonElement | null>());
   const setBubbleEl = useCallback((id: string) => {
     return (el: HTMLButtonElement | null) => {
@@ -132,12 +138,11 @@ export default function BubbleBoard() {
 
   const activeCat = data[activeIndex];
 
-  // Targets ponderados por energia (gera “rio” para o top hot)
   const hotTargets = useMemo(() => {
     if (!activeCat) return [];
     return activeCat.items
       .filter((b) => b.state === "hot")
-      .map((b) => ({ id: b.id, weight: Math.max(0.05, b.energy ** 2) })); // energy^2 enfatiza líder
+      .map((b) => ({ id: b.id, weight: Math.max(0.05, b.energy ** 2) }));
   }, [activeCat]);
 
   const coolTargets = useMemo(() => {
@@ -147,7 +152,7 @@ export default function BubbleBoard() {
       .map((b) => ({ id: b.id, weight: Math.max(0.05, b.energy ** 1.4) }));
   }, [activeCat]);
 
-  // origins A/B
+  // origins
   const [origins, setOrigins] = useState(() => ({
     originA: { x: -40, y: 900 },
     originB: { x: 900, y: -40 },
@@ -165,7 +170,6 @@ export default function BubbleBoard() {
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  // Impacto causal: partículas chegando/saindo alteram energy (inflar/deflar)
   const onImpact = useCallback((id: string, delta: number) => {
     setData((prev) =>
       prev.map((cat) => ({
@@ -180,7 +184,6 @@ export default function BubbleBoard() {
     );
   }, []);
 
-  // Decay leve para baseline por estado (se parar o fluxo, a bolha volta)
   useEffect(() => {
     const t = window.setInterval(() => {
       setData((prev) =>
@@ -197,9 +200,8 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, []);
 
-  // Simulação do estado (fake)
+  // simulação de estado
   const allIds = useMemo(() => data.flatMap((c) => c.items.map((b) => b.id)), [data]);
-
   useEffect(() => {
     const t = window.setInterval(() => {
       const pick = allIds[Math.floor(Math.random() * allIds.length)];
@@ -217,9 +219,14 @@ export default function BubbleBoard() {
         }))
       );
     }, 5200);
-
     return () => window.clearInterval(t);
   }, [allIds]);
+
+  // “área segura” em percentuais (centro das bolhas)
+  const SAFE_X_MIN = 18;
+  const SAFE_X_MAX = 82;
+  const SAFE_Y_MIN = 16;
+  const SAFE_Y_MAX = 84;
 
   return (
     <>
@@ -285,17 +292,22 @@ export default function BubbleBoard() {
               className="w-full flex-none snap-center px-5 pb-10"
               style={{ minHeight: "calc(100vh - 72px)" }}
             >
-              {/* Campo livre */}
-              <div className="pt-6">
+              <div className="pt-4">
                 <div
                   className="relative w-full"
                   style={{
+                    // altura suficiente pra caber todas (ajuste fino mobile)
                     height: "calc(100vh - 140px)",
-                    maxHeight: 640,
+                    minHeight: 420,
+                    maxHeight: 680,
                   }}
                 >
                   {cat.items.map((b) => {
-                    const pos = POSITIONS[cat.title][b.id] ?? { x: 50, y: 50 };
+                    const raw = POSITIONS[cat.title][b.id] ?? { x: 50, y: 50 };
+                    const pos = {
+                      x: clamp(raw.x, SAFE_X_MIN, SAFE_X_MAX),
+                      y: clamp(raw.y, SAFE_Y_MIN, SAFE_Y_MAX),
+                    };
 
                     return (
                       <button
