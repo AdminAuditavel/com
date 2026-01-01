@@ -56,8 +56,17 @@ function sizeClasses(size: Bubble["size"]) {
 export default function BubbleBoard() {
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
 
-  const [selected, setSelected] = useState<TopicDetail | null>(null);
-  const isOpen = !!selected;
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+const isOpen = !!selectedId;
+
+const selected = useMemo<TopicDetail | null>(() => {
+  if (!selectedId) return null;
+  for (const cat of data) {
+    const found = cat.items.find((b) => b.id === selectedId);
+    if (found) return { id: found.id, label: found.label, state: found.state };
+  }
+  return null;
+}, [data, selectedId]);
 
   const allIds = useMemo(() => {
     return data.flatMap((c) => c.items.map((b) => b.id));
@@ -127,7 +136,7 @@ export default function BubbleBoard() {
                       .filter(Boolean)
                       .join(" ")}
                     aria-label={`${b.label} — ${stateLabel(b.state)}`}
-                    onClick={() => setSelected({ id: b.id, label: b.label, state: b.state })}
+                    onClick={() => setSelectedId(b.id)}
                   >
                     <span className="font-medium leading-tight text-center px-2">
                       {b.label}
@@ -143,7 +152,7 @@ export default function BubbleBoard() {
         ))}
       </section>
 
-      <TopicModal open={isOpen} topic={selected} onClose={() => setSelected(null)} />
+      <TopicModal open={isOpen} topic={selected} onClose={() => setSelectedId(null)} />
     </>
   );
 }
