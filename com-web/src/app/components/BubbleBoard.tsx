@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import TopicModal, { type TopicDetail } from "@/app/components/TopicModal";
 
 type Bubble = {
   id: string;
