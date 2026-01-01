@@ -28,28 +28,28 @@ body {
 }
 
 /* =========================
-   Comentaram — cores (MVP)
+   Comentaram — tokens de cor (MVP)
    ========================= */
 :root {
-  --hot-bg: #fff7ed;
-  --hot-br: #fb923c;
-  --hot-tx: #9a3412;
+  --hot-bg: #fff7ed; /* laranja bem claro */
+  --hot-br: #fb923c; /* laranja */
+  --hot-tx: #9a3412; /* laranja escuro */
 
-  --steady-bg: #f8fafc;
-  --steady-br: #cbd5e1;
-  --steady-tx: #334155;
+  --steady-bg: #f8fafc; /* cinza frio claro */
+  --steady-br: #cbd5e1; /* cinza */
+  --steady-tx: #334155; /* slate */
 
-  --cool-bg: #eff6ff;
-  --cool-br: #60a5fa;
-  --cool-tx: #1e3a8a;
+  --cool-bg: #eff6ff; /* azul bem claro */
+  --cool-br: #60a5fa; /* azul */
+  --cool-tx: #1e3a8a; /* azul escuro */
 }
 
 /* =========================
-   Bolhas: “motor de vida”
-   (usa CSS variables: --e (0..1) e --t (-1..1))
+   Comentaram — bolhas “vivas”
+   (motor CSS usando --e (0..1) e --t (-1..1))
    ========================= */
 
-/* Batimento base (sístole/diástole) */
+/* Batimento base (mais energia => mais amplitude) */
 @keyframes bubbleBeat {
   0%,
   100% {
@@ -63,7 +63,7 @@ body {
   }
 }
 
-/* Wobble orgânico bem sutil no “halo” */
+/* Halo orgânico (wobble sutil) */
 @keyframes bubbleWobble {
   0%,
   100% {
@@ -81,7 +81,7 @@ body {
   }
 }
 
-/* Ripple rápido (quando tendência sobe) */
+/* Ripple quando “sobe” (tendência positiva) */
 @keyframes bubbleRipple {
   0% {
     transform: translateZ(0) scale(0.9);
@@ -96,31 +96,28 @@ body {
   }
 }
 
-/* Classe base (aplique junto com bubble-hot/steady/cool) */
 .bubble {
-  /* defaults caso não venha inline */
+  /* defaults (caso não venha inline) */
   --e: 0.55; /* energia 0..1 */
-  --t: 0;    /* trend -1..1 */
+  --t: 0; /* trend -1..1 */
 
-  /* parâmetros por bolha (serão sobrescritos por estado) */
-  --beat: calc(0.012 + var(--e) * 0.04); /* amplitude do batimento */
-  --glow: calc(6px + var(--e) * 18px);   /* intensidade do glow */
+  /* derivados */
+  --beat: calc(0.012 + var(--e) * 0.04);
+  --glow: calc(5px + var(--e) * 16px);
   --ring: currentColor;
 
   position: relative;
   will-change: transform, filter, box-shadow;
   transform: translateZ(0);
 
-  /* “corpo” mais orgânico */
   box-shadow:
     0 6px 18px rgba(2, 6, 23, 0.06),
     0 0 var(--glow) color-mix(in srgb, currentColor 18%, transparent);
 
-  /* beat contínuo (a vida) */
   animation: bubbleBeat var(--beatDur) ease-in-out infinite;
 }
 
-/* Halo/wobble atrás */
+/* Halo atrás (orgânico) */
 .bubble::before {
   content: "";
   position: absolute;
@@ -131,13 +128,13 @@ body {
     color-mix(in srgb, currentColor 22%, transparent),
     transparent 55%
   );
-  opacity: calc(0.15 + var(--e) * 0.25);
+  opacity: calc(0.12 + var(--e) * 0.22);
   z-index: 0;
   pointer-events: none;
   animation: bubbleWobble var(--wobbleDur) ease-in-out infinite;
 }
 
-/* Ripple (aparece por cima, mas ainda atrás do texto) */
+/* Ripple */
 .bubble::after {
   content: "";
   position: absolute;
@@ -149,31 +146,33 @@ body {
   pointer-events: none;
 }
 
-/* Quando está subindo: dispara ripple + dá um “pop” visual */
 .bubble-rise::after {
-  animation: bubbleRipple 700ms ease-out both;
+  animation: bubbleRipple 650ms ease-out both;
 }
 
-/* Quando está caindo: reduz um pouco a presença */
 .bubble-fall {
   filter: saturate(0.92);
 }
 
-/* =========================
-   Estados (controlam ritmo e brilho)
-   ========================= */
+/* Texto acima dos halos */
+.bubble > * {
+  position: relative;
+  z-index: 1;
+}
 
+/* Estados */
 .bubble-hot {
   background: var(--hot-bg);
   border-color: var(--hot-br);
   color: var(--hot-tx);
 
-  /* HOT: mais rápido + mais glow */
-  --beatDur: 1.25s;
-  --wobbleDur: 1.8s;
+  /* HOT (mobile): rápido, mas não frenético */
+  --beatDur: 1.35s;
+  --wobbleDur: 1.9s;
+
   box-shadow:
     0 8px 22px rgba(2, 6, 23, 0.08),
-    0 0 calc(var(--glow) + 8px) color-mix(in srgb, var(--hot-br) 30%, transparent);
+    0 0 calc(var(--glow) + 7px) color-mix(in srgb, var(--hot-br) 30%, transparent);
 }
 
 .bubble-steady {
@@ -181,9 +180,9 @@ body {
   border-color: var(--steady-br);
   color: var(--steady-tx);
 
-  /* STEADY: quase parado */
-  --beatDur: 2.8s;
-  --wobbleDur: 3.2s;
+  --beatDur: 3.0s;
+  --wobbleDur: 3.3s;
+
   opacity: 0.98;
 }
 
@@ -192,25 +191,17 @@ body {
   border-color: var(--cool-br);
   color: var(--cool-tx);
 
-  /* COOL: lento e “murchando” */
-  --beatDur: 3.6s;
-  --wobbleDur: 4.2s;
+  --beatDur: 3.8s;
+  --wobbleDur: 4.4s;
 
   opacity: 0.88;
+
   box-shadow:
     0 6px 18px rgba(2, 6, 23, 0.05),
-    0 0 calc(var(--glow) - 3px) color-mix(in srgb, var(--cool-br) 22%, transparent);
+    0 0 calc(var(--glow) - 2px) color-mix(in srgb, var(--cool-br) 22%, transparent);
 }
 
-/* Texto sempre acima dos pseudo-elementos */
-.bubble > * {
-  position: relative;
-  z-index: 1;
-}
-
-/* =========================
-   Acessibilidade: reduzir animações
-   ========================= */
+/* Acessibilidade */
 @media (prefers-reduced-motion: reduce) {
   .bubble,
   .bubble::before,
@@ -220,44 +211,52 @@ body {
 }
 
 /* =========================
-   Mantém seu fluxo global como está
+   Comentaram — fluxo global (tela → bolha / bolha → tela)
    ========================= */
 
 @keyframes flowMove {
   0% {
-    transform: translate(var(--x0), var(--y0)) scale(0.9);
+    transform: translate(var(--x0), var(--y0)) scale(0.9) rotate(var(--rot, 0deg));
     opacity: 0;
   }
   10% {
     opacity: 0.85;
   }
   100% {
-    transform: translate(var(--x1), var(--y1)) scale(1.1);
+    transform: translate(var(--x1), var(--y1)) scale(1.1) rotate(var(--rot, 0deg));
     opacity: 0;
   }
 }
 
+/* camada fixa por cima da tela toda */
 .flow-layer {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 60;
+  z-index: 60; /* acima das bolhas */
 }
 
+/* “balão de comentário” (menos “carimbado”, com variação de tamanho/rotação) */
 .flow-particle {
   position: absolute;
   left: 0;
   top: 0;
-  width: 14px;
-  height: 10px;
+
+  width: var(--sz, 14px);
+  height: calc(var(--sz, 14px) * 0.72);
+
   border-radius: 999px;
-  border: 1px solid currentColor;
-  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid color-mix(in srgb, currentColor 55%, transparent);
+  background: color-mix(in srgb, #fff 55%, transparent);
+
   opacity: 0;
   will-change: transform, opacity;
   animation: flowMove var(--dur) ease-in-out forwards;
+
+  filter: blur(0.2px);
 }
 
+/* “rabinho” do balão */
 .flow-particle::after {
   content: "";
   position: absolute;
@@ -265,9 +264,9 @@ body {
   bottom: -3px;
   width: 6px;
   height: 6px;
-  border-left: 1px solid currentColor;
-  border-bottom: 1px solid currentColor;
+  border-left: 1px solid color-mix(in srgb, currentColor 55%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, currentColor 55%, transparent);
   transform: rotate(35deg);
-  background: rgba(255, 255, 255, 0.65);
+  background: color-mix(in srgb, #fff 55%, transparent);
   border-bottom-left-radius: 2px;
 }
