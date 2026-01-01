@@ -7,9 +7,15 @@ function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
-function pointsToPath(points: Point[], w: number, h: number, pad: number, rightPad: number) {
+function fmtTime(d: Date) {
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+function pointsToPath(points: Point[], w: number, h: number, pad: number) {
   if (points.length === 0) return "";
-  const innerW = w - pad - rightPad;
+  const innerW = w - pad * 2;
   const innerH = h - pad * 2;
 
   const toX = (t: number) => pad + (t / 15) * innerW;
@@ -20,21 +26,22 @@ function pointsToPath(points: Point[], w: number, h: number, pad: number, rightP
     .join(" ");
 }
 
-function fmtTime(d: Date) {
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${hh}:${mm}`;
+function xAt(minutes: number, w: number, pad: number) {
+  const innerW = w - pad * 2;
+  return pad + (minutes / 15) * innerW;
 }
 
-// Percentual “mais impactante”:
-// usa variação absoluta no período e amplifica um pouco.
-// Depois, clamp 0..100.
-function boostedPercent(points: Point[], boost = 1.35) {
+function yAt(v: number, h: number, pad: number) {
+  const innerH = h - pad * 2;
+  return pad + (1 - clamp01(v)) * innerH;
+}
+
+// Percentual “impactante”
+function boostedPercent(points: Point[], boost = 1.6) {
   if (points.length < 2) return 0;
   const first = clamp01(points[0]!.v);
   const last = clamp01(points[points.length - 1]!.v);
-
-  const delta = Math.abs(last - first); // 0..1
+  const delta = Math.abs(last - first);
   return Math.max(0, Math.min(100, Math.round(delta * 100 * boost)));
 }
 
@@ -45,8 +52,8 @@ function arrow(dir: Dir) {
 export default function TrendChart({
   hot,
   cool,
-  width = 340,
-  height = 180,
+  width = 360,
+  height = 190,
   now = new Date(),
 }: {
   hot: { name: string; points: Point[] };
@@ -55,26 +62,28 @@ export default function TrendChart({
   height?: number;
   now?: Date;
 }) {
-  const pad = 10;
+  const pad = 12;
 
-  // espaço para labels à direita (2 linhas)
-  const rightPad = 110;
-  const plotRightX = width - rightPad;
-
-  const innerW = plotRightX - pad;
-  const xAt = (minutes: number) => pad + (minutes / 15) * innerW;
-  const yAt = (v: number) => pad + (1 - clamp01(v)) * (height - pad * 2);
-
-  const hotPath = pointsToPath(hot.points, width, height, pad, rightPad);
-  const coolPath = pointsToPath(cool.points, width, height, pad, rightPad);
+  const hotPath = pointsToPath(hot.points, width, height, pad);
+  const coolPath = pointsToPath(cool.points, width, height, pad);
 
   const hotLast = hot.points[hot.points.length - 1]?.v ?? 0.5;
   const coolLast = cool.points[cool.points.length - 1]?.v ?? 0.5;
 
-  const hotPct = boostedPercent(hot.points, 1.6);
-  const coolPct = boostedPercent(cool.points, 1.6);
+  const hotPct = boostedPercent(hot.points, 1.9);
+  const coolPct = boostedPercent(cool.points, 1.9);
 
-  // Eixo X: 4 tempos (-15, -10, -5, agora)
+  const hotX = xAt(15, width, pad);
+  const coolX = xAt(15, width, pad);
+  const hotY = yAt(hotLast, height, pad);
+  const coolY = yAt(coolLast, height, pad);
+
+  // evitar overlap dos labels quando ficam muito perto
+  const tooClose = Math.abs(hotY - coolY) < 34;
+  const hotDY = tooClose && hotY <= coolY ? -18 : 0;
+  const coolDY = tooClose && coolY < hotY ? 18 : 0;
+
+  // eixo X 4 tempos
   const t15 = new Date(now.getTime() - 15 * 60 * 1000);
   const t10 = new Date(now.getTime() - 10 * 60 * 1000);
   const t5 = new Date(now.getTime() - 5 * 60 * 1000);
@@ -83,12 +92,28 @@ export default function TrendChart({
   return (
     <div className="w-full">
       <div className="w-full rounded-xl bg-white/70 px-2 py-2">
-        <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-          {/* grid leve horizontal */}
+        <svg
+          width="100%"
+          height={height}
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
+          aria-label="Gráfico de tendência"
+        >
+          {/* grid horizontal leve */}
           <g opacity="0.75">
             {[0.2, 0.5, 0.8].map((v) => {
-              const y = yAt(v);
-              return <line key={v} x1={pad} y1={y} x2={plotRightX} y2={y} stroke="#e5e7eb" strokeWidth="1" />;
+              const y = yAt(v, height, pad);
+              return (
+                <line
+                  key={v}
+                  x1={pad}
+                  y1={y}
+                  x2={width - pad}
+                  y2={y}
+                  stroke="#e5e7eb"
+                  strokeWidth="1"
+                />
+              );
             })}
           </g>
 
@@ -97,60 +122,46 @@ export default function TrendChart({
           <path d={hotPath} fill="none" stroke="var(--hot-br)" strokeWidth="2.2" />
 
           {/* pontos finais */}
-          <circle cx={plotRightX} cy={yAt(coolLast)} r="3.5" fill="var(--cool-br)" />
-          <circle cx={plotRightX} cy={yAt(hotLast)} r="3.5" fill="var(--hot-br)" />
+          <circle cx={width - pad} cy={coolY} r="3.6" fill="var(--cool-br)" />
+          <circle cx={width - pad} cy={hotY} r="3.6" fill="var(--hot-br)" />
 
-          {/* labels à direita: Nome em cima, percentual embaixo (negrito) */}
-          {(() => {
-            const cx = plotRightX + 10;
+          {/* Labels SOBRE o gráfico (dentro da área), com fundo para legibilidade */}
+          {/* HOT */}
+          <g transform={`translate(${hotX - 138}, ${hotY + hotDY - 20})`}>
+            <rect x={0} y={0} width={134} height={34} rx={8} fill="rgba(255,255,255,0.78)" />
+            <text x={10} y={14} fontSize="10" fill="#374151">
+              {hot.name}
+            </text>
+            <text x={10} y={29} fontSize="12" fill="#111827" fontWeight={700}>
+              {arrow("up")}
+              {hotPct}%
+            </text>
+          </g>
 
-            // offsets para evitar sobreposição quando hot/cool ficarem muito perto
-            const hotY = yAt(hotLast);
-            const coolY = yAt(coolLast);
-            const tooClose = Math.abs(hotY - coolY) < 32;
+          {/* COOL */}
+          <g transform={`translate(${coolX - 138}, ${coolY + coolDY - 20})`}>
+            <rect x={0} y={0} width={134} height={34} rx={8} fill="rgba(255,255,255,0.78)" />
+            <text x={10} y={14} fontSize="10" fill="#374151">
+              {cool.name}
+            </text>
+            <text x={10} y={29} fontSize="12" fill="#111827" fontWeight={700}>
+              {arrow("down")}
+              {coolPct}%
+            </text>
+          </g>
 
-            const hotOffset = tooClose && hotY <= coolY ? -16 : 0;
-            const coolOffset = tooClose && coolY < hotY ? 16 : 0;
-
-            return (
-              <>
-                {/* HOT */}
-                <g transform={`translate(${cx}, ${hotY + hotOffset})`}>
-                  <text x={0} y={-6} fontSize="10" fill="#374151">
-                    {hot.name}
-                  </text>
-                  <text x={0} y={10} fontSize="12" fill="#111827" fontWeight={700}>
-                    {arrow("up")}
-                    {hotPct}%
-                  </text>
-                </g>
-
-                {/* COOL */}
-                <g transform={`translate(${cx}, ${coolY + coolOffset})`}>
-                  <text x={0} y={-6} fontSize="10" fill="#374151">
-                    {cool.name}
-                  </text>
-                  <text x={0} y={10} fontSize="12" fill="#111827" fontWeight={700}>
-                    {arrow("down")}
-                    {coolPct}%
-                  </text>
-                </g>
-              </>
-            );
-          })()}
-
-          {/* eixo X com 4 horas */}
+          {/* eixo X com 4 horários */}
           <g fill="#6b7280" fontSize="10">
-            <text x={xAt(0)} y={height - 2}>
+            <text x={xAt(0, width, pad)} y={height - 2}>
               {fmtTime(t15)}
             </text>
-            <text x={xAt(5) - 10} y={height - 2}>
+            <text x={xAt(5, width, pad) - 10} y={height - 2}>
               {fmtTime(t10)}
             </text>
-            <text x={xAt(10) - 10} y={height - 2}>
+            <text x={xAt(10, width, pad) - 10} y={height - 2}>
               {fmtTime(t5)}
             </text>
-            <text x={xAt(15) - 22} y={height - 2}>
+            <text x={xAt(15, width, pad) - 22} y={height - 2}>
               {fmtTime(t0)}
             </text>
           </g>
