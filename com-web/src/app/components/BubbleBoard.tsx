@@ -1,4 +1,7 @@
+// src/app/components/BubbleBoard.tsx
 "use client";
+
+import { useEffect, useMemo, useState } from "react";
 
 type Bubble = {
   id: string;
@@ -12,7 +15,7 @@ type CategoryBlock = {
   items: Bubble[];
 };
 
-const DATA: CategoryBlock[] = [
+const INITIAL_DATA: CategoryBlock[] = [
   {
     title: "ESPORTES",
     items: [
@@ -50,9 +53,52 @@ function sizeClasses(size: Bubble["size"]) {
 }
 
 export default function BubbleBoard() {
+  const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
+
+  // Lista achatada de ids (recomputada quando data muda)
+  const allIds = useMemo(() => {
+    return data.flatMap((c) => c.items.map((b) => b.id));
+  }, [data]);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      const pick = allIds[Math.floor(Math.random() * allIds.length)];
+      if (!pick) return;
+
+      setData((prev) =>
+        prev.map((cat) => ({
+          ...cat,
+          items: cat.items.map((b) => {
+            if (b.id !== pick) return b;
+
+            // ciclo simples: cool -> steady -> hot -> steady -> cool...
+            const nextState: Bubble["state"] =
+              b.state === "cool" ? "steady" : b.state === "steady" ? "hot" : "steady";
+
+            // ajuste leve no tamanho para dar sensação de pulso
+            const nextSize: Bubble["size"] =
+              nextState === "hot"
+                ? b.size === "sm"
+                  ? "md"
+                  : "lg"
+                : nextState === "cool"
+                  ? b.size === "lg"
+                    ? "md"
+                    : "sm"
+                  : b.size;
+
+            return { ...b, state: nextState, size: nextSize };
+          }),
+        }))
+      );
+    }, 4500);
+
+    return () => clearInterval(t);
+  }, [allIds]);
+
   return (
     <section className="px-5 pb-10 space-y-10">
-      {DATA.map((cat) => (
+      {data.map((cat) => (
         <div key={cat.title}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xs font-semibold tracking-widest text-gray-500">
