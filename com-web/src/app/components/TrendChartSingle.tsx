@@ -35,7 +35,6 @@ function yAt(v: number, h: number, pad: number) {
   return pad + (1 - clamp01(v)) * innerH;
 }
 
-// “percentual” visual (impacto)
 function boostedPercent(points: Point[], boost = 2.4) {
   if (points.length < 2) return 0;
   const first = clamp01(points[0]!.v);
@@ -52,14 +51,16 @@ export default function TrendChartSingle({
   width = 360,
   height = 160,
   now = new Date(),
+  showXAxis = true,
 }: {
   name: string;
   direction: "up" | "down";
-  color: string; // ex: "var(--hot-br)"
+  color: string;
   points: Point[];
   width?: number;
   height?: number;
   now?: Date;
+  showXAxis?: boolean;
 }) {
   const pad = 12;
 
@@ -76,15 +77,14 @@ export default function TrendChartSingle({
   const t5 = new Date(now.getTime() - 5 * 60 * 1000);
   const t0 = now;
 
-  // label fixo à direita dentro do próprio gráfico (agora não conflita com outra linha)
   const cardW = 150;
   const cardH = 42;
   const cardX = width - pad - cardW;
-  let cardY = endY - cardH / 2;
 
-  // clamp para não sair
+  let cardY = endY - cardH / 2;
+  const axisH = showXAxis ? 14 : 0;
   const minY = pad;
-  const maxY = height - pad - 14 - cardH;
+  const maxY = height - pad - axisH - cardH;
   cardY = Math.max(minY, Math.min(maxY, cardY));
 
   return (
@@ -114,21 +114,23 @@ export default function TrendChartSingle({
           </text>
         </g>
 
-        {/* eixo X (4 tempos) */}
-        <g fill="#6b7280" fontSize="10">
-          <text x={xAt(0, width, pad)} y={height - 2}>
-            {fmtTime(t15)}
-          </text>
-          <text x={xAt(5, width, pad) - 10} y={height - 2}>
-            {fmtTime(t10)}
-          </text>
-          <text x={xAt(10, width, pad) - 10} y={height - 2}>
-            {fmtTime(t5)}
-          </text>
-          <text x={xAt(15, width, pad) - 22} y={height - 2}>
-            {fmtTime(t0)}
-          </text>
-        </g>
+        {/* eixo X (opcional) */}
+        {showXAxis && (
+          <g fill="#6b7280" fontSize="10">
+            <text x={xAt(0, width, pad)} y={height - 2}>
+              {fmtTime(t15)}
+            </text>
+            <text x={xAt(5, width, pad) - 10} y={height - 2}>
+              {fmtTime(t10)}
+            </text>
+            <text x={xAt(10, width, pad) - 10} y={height - 2}>
+              {fmtTime(t5)}
+            </text>
+            <text x={xAt(15, width, pad) - 22} y={height - 2}>
+              {fmtTime(t0)}
+            </text>
+          </g>
+        )}
       </svg>
     </div>
   );
