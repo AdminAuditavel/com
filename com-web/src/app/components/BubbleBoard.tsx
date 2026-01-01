@@ -11,7 +11,7 @@ type Bubble = {
   label: string;
   state: "hot" | "steady" | "cool";
   size: "lg" | "md" | "sm";
-  energy: number; // 0..1
+  energy: number; // 0..1 (vai virar “volume”)
   trend: -1 | 0 | 1;
 };
 
@@ -24,23 +24,23 @@ const INITIAL_DATA: CategoryBlock[] = [
   {
     title: "ESPORTES",
     items: [
-      { id: "flamengo", label: "Flamengo", state: "hot", size: "lg", energy: 0.9, trend: 1 },
-      { id: "palmeiras", label: "Palmeiras", state: "hot", size: "md", energy: 0.78, trend: 1 },
-      { id: "corinthians", label: "Corinthians", state: "steady", size: "md", energy: 0.58, trend: 0 },
-      { id: "selecao", label: "Seleção Brasileira", state: "steady", size: "sm", energy: 0.5, trend: 0 },
-      { id: "ufc", label: "UFC", state: "steady", size: "sm", energy: 0.52, trend: 0 },
-      { id: "mcgregor", label: "McGregor", state: "cool", size: "sm", energy: 0.22, trend: -1 },
-      { id: "futebol-mundial", label: "Futebol Mundial", state: "hot", size: "md", energy: 0.75, trend: 1 },
+      { id: "flamengo", label: "Flamengo", state: "hot", size: "lg", energy: 0.82, trend: 1 },
+      { id: "palmeiras", label: "Palmeiras", state: "hot", size: "md", energy: 0.68, trend: 1 },
+      { id: "corinthians", label: "Corinthians", state: "steady", size: "md", energy: 0.52, trend: 0 },
+      { id: "selecao", label: "Seleção Brasileira", state: "steady", size: "sm", energy: 0.46, trend: 0 },
+      { id: "ufc", label: "UFC", state: "steady", size: "sm", energy: 0.48, trend: 0 },
+      { id: "mcgregor", label: "McGregor", state: "cool", size: "sm", energy: 0.2, trend: -1 },
+      { id: "futebol-mundial", label: "Futebol Mundial", state: "hot", size: "md", energy: 0.62, trend: 1 },
     ],
   },
   {
     title: "POLÍTICA",
     items: [
-      { id: "presidencia", label: "Presidência", state: "hot", size: "md", energy: 0.82, trend: 1 },
-      { id: "congresso", label: "Congresso", state: "steady", size: "sm", energy: 0.55, trend: 0 },
-      { id: "stf", label: "STF", state: "hot", size: "sm", energy: 0.7, trend: 1 },
-      { id: "eleicoes-2026", label: "Eleições 2026", state: "steady", size: "sm", energy: 0.6, trend: 0 },
-      { id: "gastos-publicos", label: "Gastos Públicos", state: "steady", size: "sm", energy: 0.48, trend: -1 },
+      { id: "presidencia", label: "Presidência", state: "hot", size: "md", energy: 0.72, trend: 1 },
+      { id: "congresso", label: "Congresso", state: "steady", size: "sm", energy: 0.5, trend: 0 },
+      { id: "stf", label: "STF", state: "hot", size: "sm", energy: 0.58, trend: 1 },
+      { id: "eleicoes-2026", label: "Eleições 2026", state: "steady", size: "sm", energy: 0.52, trend: 0 },
+      { id: "gastos-publicos", label: "Gastos Públicos", state: "steady", size: "sm", energy: 0.44, trend: -1 },
     ],
   },
 ];
@@ -52,6 +52,7 @@ function stateLabel(s: Bubble["state"]) {
 }
 
 function sizeClasses(size: Bubble["size"]) {
+  // mantemos “base”, mas o INFLAR real vem de --e no CSS
   if (size === "lg") return "w-36 h-36 text-base";
   if (size === "md") return "w-28 h-28 text-sm";
   return "w-22 h-22 text-xs";
@@ -64,7 +65,6 @@ function clamp01(n: number) {
 export default function BubbleBoard() {
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
 
-  // pager / categoria ativa
   const [activeIndex, setActiveIndex] = useState(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
@@ -84,9 +84,8 @@ export default function BubbleBoard() {
     if (idx !== activeIndex) setActiveIndex(idx);
   }, [activeIndex]);
 
-  // refs dos botões (para saber o DOMRect de cada bolha)
+  // refs dos botões (DOMRect)
   const bubbleElsRef = useRef(new Map<string, HTMLButtonElement | null>());
-
   const setBubbleEl = useCallback((id: string) => {
     return (el: HTMLButtonElement | null) => {
       bubbleElsRef.current.set(id, el);
@@ -111,16 +110,20 @@ export default function BubbleBoard() {
     return null;
   }, [data, selectedId]);
 
-  // ids por estado (para o FlowLayer)
-  const hotIds = useMemo(() => {
-    return data.flatMap((c) => c.items.filter((b) => b.state === "hot").map((b) => b.id));
-  }, [data]);
+  // Apenas a categoria ativa alimenta o FlowLayer (resolve partículas indo pra bolhas fora da tela)
+  const activeCat = data[activeIndex];
 
-  const coolIds = useMemo(() => {
-    return data.flatMap((c) => c.items.filter((b) => b.state === "cool").map((b) => b.id));
-  }, [data]);
+  const activeHotIds = useMemo(() => {
+    if (!activeCat) return [];
+    return activeCat.items.filter((b) => b.state === "hot").map((b) => b.id);
+  }, [activeCat]);
 
-  // pontos fixos (2 “infinitos”): atualiza em resize
+  const activeCoolIds = useMemo(() => {
+    if (!activeCat) return [];
+    return activeCat.items.filter((b) => b.state === "cool").map((b) => b.id);
+  }, [activeCat]);
+
+  // origins A/B
   const [origins, setOrigins] = useState(() => ({
     originA: { x: -40, y: 900 },
     originB: { x: 900, y: -40 },
@@ -138,9 +141,47 @@ export default function BubbleBoard() {
     return () => window.removeEventListener("resize", update);
   }, []);
 
+  // Impacto causal: partículas chegando/saindo alteram energy (inflar/deflar)
+  const onImpact = useCallback((id: string, delta: number) => {
+    setData((prev) =>
+      prev.map((cat) => ({
+        ...cat,
+        items: cat.items.map((b) => {
+          if (b.id !== id) return b;
+          const nextEnergy = clamp01(b.energy + delta);
+
+          // trend derivado do delta (apenas para ripple/queda)
+          const trend: Bubble["trend"] = delta > 0 ? 1 : delta < 0 ? -1 : 0;
+
+          // estado pode continuar vindo da simulação por enquanto;
+          // (quando você tiver dados reais, state virá do sinal)
+          return { ...b, energy: nextEnergy, trend };
+        }),
+      }))
+    );
+  }, []);
+
+  // “decay” leve: se parar de receber bolhas, volta ao baseline do estado
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      setData((prev) =>
+        prev.map((cat) => ({
+          ...cat,
+          items: cat.items.map((b) => {
+            const baseline = b.state === "hot" ? 0.72 : b.state === "steady" ? 0.5 : 0.25;
+            const nextEnergy = clamp01(b.energy + (baseline - b.energy) * 0.06);
+            return { ...b, energy: nextEnergy };
+          }),
+        }))
+      );
+    }, 250);
+
+    return () => window.clearInterval(t);
+  }, []);
+
+  // Simulação do estado (ainda útil no fake data)
   const allIds = useMemo(() => data.flatMap((c) => c.items.map((b) => b.id)), [data]);
 
-  // Simulação do pulso (mais “vivo”)
   useEffect(() => {
     const t = window.setInterval(() => {
       const pick = allIds[Math.floor(Math.random() * allIds.length)];
@@ -155,31 +196,11 @@ export default function BubbleBoard() {
             const nextState: Bubble["state"] =
               b.state === "cool" ? "steady" : b.state === "steady" ? "hot" : "cool";
 
-            const trend: Bubble["trend"] =
-              nextState === "hot" ? 1 : nextState === "cool" ? -1 : 0;
-
-            const baseTarget =
-              nextState === "hot" ? 0.88 : nextState === "steady" ? 0.6 : 0.22;
-            const target = clamp01(baseTarget + (Math.random() * 0.12 - 0.06));
-
-            const nextEnergy = clamp01(b.energy + (target - b.energy) * 0.55);
-
-            const nextSize: Bubble["size"] =
-              nextState === "hot" && nextEnergy > 0.78
-                ? b.size === "sm"
-                  ? "md"
-                  : "lg"
-                : nextState === "cool" && nextEnergy < 0.32
-                  ? b.size === "lg"
-                    ? "md"
-                    : "sm"
-                  : b.size;
-
-            return { ...b, state: nextState, size: nextSize, energy: nextEnergy, trend };
+            return { ...b, state: nextState };
           }),
         }))
       );
-    }, 2000);
+    }, 5200);
 
     return () => window.clearInterval(t);
   }, [allIds]);
@@ -190,11 +211,12 @@ export default function BubbleBoard() {
         originA={origins.originA}
         originB={origins.originB}
         getTargetRectById={getTargetRectById}
-        hotIds={hotIds}
-        coolIds={coolIds}
+        hotIds={activeHotIds}
+        coolIds={activeCoolIds}
+        onImpact={onImpact}
       />
 
-      {/* Menu (tabs) fixo no topo da área */}
+      {/* Menu/tabs (sem a mensagem de arrastar) */}
       <div className="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-gray-100">
         <div className="px-5 py-3">
           <div className="flex gap-2">
@@ -219,13 +241,10 @@ export default function BubbleBoard() {
               );
             })}
           </div>
-          <div className="mt-2 text-[11px] text-gray-500">
-            Arraste para o lado para trocar de assunto
-          </div>
         </div>
       </div>
 
-      {/* Pager horizontal (cada categoria ocupa “uma tela”) */}
+      {/* Pager horizontal */}
       <div
         ref={viewportRef}
         onScroll={onScroll}
@@ -235,11 +254,8 @@ export default function BubbleBoard() {
           "scroll-smooth",
           "[scrollbar-width:none] [-ms-overflow-style:none]",
         ].join(" ")}
-        style={{
-          WebkitOverflowScrolling: "touch",
-        }}
+        style={{ WebkitOverflowScrolling: "touch" }}
       >
-        {/* esconder scrollbar no webkit */}
         <style jsx>{`
           div::-webkit-scrollbar {
             display: none;
@@ -251,10 +267,17 @@ export default function BubbleBoard() {
             <section
               key={cat.title}
               className="w-full flex-none snap-center px-5 pb-10"
-              style={{ minHeight: "calc(100vh - 92px)" }}
+              style={{ minHeight: "calc(100vh - 72px)" }}
             >
+              {/* distribuição melhor: grid centralizado */}
               <div className="pt-6">
-                <div className="flex flex-wrap gap-3">
+                <div
+                  className={[
+                    "grid gap-4 place-items-center",
+                    // colunas ajustadas para mobile; fica “espalhado” em vez de fila
+                    "grid-cols-2",
+                  ].join(" ")}
+                >
                   {cat.items.map((b) => (
                     <button
                       key={b.id}
