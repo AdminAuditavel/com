@@ -36,7 +36,7 @@ function yAt(v: number, h: number, pad: number) {
   return pad + (1 - clamp01(v)) * innerH;
 }
 
-function boostedPercent(points: Point[], boost = 2.2) {
+function boostedPercent(points: Point[], boost = 2.4) {
   if (points.length < 2) return 0;
   const first = clamp01(points[0]!.v);
   const last = clamp01(points[points.length - 1]!.v);
@@ -81,12 +81,12 @@ export default function TrendChart({
   const t5 = new Date(now.getTime() - 5 * 60 * 1000);
   const t0 = now;
 
-  // Label “card” fixo à direita (X), Y segue o ponto final
+  // Card fixo à direita (X), Y segue o ponto final
   const cardW = 128;
   const cardH = 38;
-  const cardX = width - pad - cardW; // SEMPRE alinhado à direita
+  const cardX = width - pad - cardW; // alinhado à direita
 
-  // Anti-overlap: se ficarem muito próximos, empurra um pra cima e outro pra baixo
+  // Anti-overlap
   const tooClose = Math.abs(hotY0 - coolY0) < cardH + 8;
   let hotY = hotY0;
   let coolY = coolY0;
@@ -101,11 +101,17 @@ export default function TrendChart({
     }
   }
 
-  // Clamp para não sair do gráfico
+  // Clamp (considera espaço do eixo X)
   const minY = pad + cardH / 2;
-  const maxY = height - pad - 14 - cardH / 2; // -14 por causa do eixo X embaixo
+  const maxY = height - pad - 14 - cardH / 2;
   hotY = Math.max(minY, Math.min(maxY, hotY));
   coolY = Math.max(minY, Math.min(maxY, coolY));
+
+  // ponto final (x)
+  const endX = xAt(15, width, pad);
+
+  // leader line: vai até a borda esquerda do card
+  const leadToX = cardX - 6;
 
   return (
     <div className="w-full">
@@ -123,11 +129,33 @@ export default function TrendChart({
           <path d={coolPath} fill="none" stroke="var(--cool-br)" strokeWidth="2.2" />
           <path d={hotPath} fill="none" stroke="var(--hot-br)" strokeWidth="2.2" />
 
-          {/* pontos finais */}
-          <circle cx={xAt(15, width, pad)} cy={coolY0} r="3.6" fill="var(--cool-br)" />
-          <circle cx={xAt(15, width, pad)} cy={hotY0} r="3.6" fill="var(--hot-br)" />
+          {/* leader lines (pontilhadas) do último ponto até o card */}
+          <line
+            x1={endX}
+            y1={hotY0}
+            x2={leadToX}
+            y2={hotY}
+            stroke="var(--hot-br)"
+            strokeWidth="1.5"
+            strokeDasharray="3 4"
+            opacity="0.75"
+          />
+          <line
+            x1={endX}
+            y1={coolY0}
+            x2={leadToX}
+            y2={coolY}
+            stroke="var(--cool-br)"
+            strokeWidth="1.5"
+            strokeDasharray="3 4"
+            opacity="0.75"
+          />
 
-          {/* HOT label: X fixo na direita, Y segue o ponto */}
+          {/* pontos finais */}
+          <circle cx={endX} cy={coolY0} r="3.6" fill="var(--cool-br)" />
+          <circle cx={endX} cy={hotY0} r="3.6" fill="var(--hot-br)" />
+
+          {/* HOT card */}
           <g transform={`translate(${cardX}, ${hotY - cardH / 2})`}>
             <rect x={0} y={0} width={cardW} height={cardH} rx={10} fill="rgba(255,255,255,0.90)" />
             <rect x={0} y={0} width={4} height={cardH} rx={10} fill="var(--hot-br)" />
@@ -140,7 +168,7 @@ export default function TrendChart({
             </text>
           </g>
 
-          {/* COOL label */}
+          {/* COOL card */}
           <g transform={`translate(${cardX}, ${coolY - cardH / 2})`}>
             <rect x={0} y={0} width={cardW} height={cardH} rx={10} fill="rgba(255,255,255,0.90)" />
             <rect x={0} y={0} width={4} height={cardH} rx={10} fill="var(--cool-br)" />
