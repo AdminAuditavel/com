@@ -11,12 +11,12 @@ type Bubble = {
   label: string;
   state: "hot" | "steady" | "cool";
   size: "lg" | "md" | "sm";
-  energy: number; // 0..1 (vai virar “volume”)
+  energy: number; // 0..1 (volume)
   trend: -1 | 0 | 1;
 };
 
 type CategoryBlock = {
-  title: string;
+  title: "ESPORTES" | "POLÍTICA";
   items: Bubble[];
 };
 
@@ -45,6 +45,30 @@ const INITIAL_DATA: CategoryBlock[] = [
   },
 ];
 
+type BubblePos = { x: number; y: number }; // percent
+const POSITIONS: Record<CategoryBlock["title"], Record<string, BubblePos>> = {
+  ESPORTES: {
+    flamengo: { x: 66, y: 30 },
+    palmeiras: { x: 30, y: 26 },
+    corinthians: { x: 46, y: 52 },
+    selecao: { x: 20, y: 60 },
+    ufc: { x: 74, y: 58 },
+    mcgregor: { x: 58, y: 74 },
+    "futebol-mundial": { x: 40, y: 74 },
+  },
+  POLÍTICA: {
+    presidencia: { x: 58, y: 32 },
+    stf: { x: 30, y: 40 },
+    congresso: { x: 72, y: 50 },
+    "eleicoes-2026": { x: 40, y: 62 },
+    "gastos-publicos": { x: 58, y: 74 },
+  },
+};
+
+function clamp01(n: number) {
+  return Math.max(0, Math.min(1, n));
+}
+
 function stateLabel(s: Bubble["state"]) {
   if (s === "hot") return "Aquecendo";
   if (s === "cool") return "Esfriando";
@@ -52,19 +76,15 @@ function stateLabel(s: Bubble["state"]) {
 }
 
 function sizeClasses(size: Bubble["size"]) {
-  // mantemos “base”, mas o INFLAR real vem de --e no CSS
   if (size === "lg") return "w-36 h-36 text-base";
   if (size === "md") return "w-28 h-28 text-sm";
   return "w-22 h-22 text-xs";
 }
 
-function clamp01(n: number) {
-  return Math.max(0, Math.min(1, n));
-}
-
 export default function BubbleBoard() {
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
 
+  // pager
   const [activeIndex, setActiveIndex] = useState(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
@@ -110,17 +130,21 @@ export default function BubbleBoard() {
     return null;
   }, [data, selectedId]);
 
-  // Apenas a categoria ativa alimenta o FlowLayer (resolve partículas indo pra bolhas fora da tela)
   const activeCat = data[activeIndex];
 
-  const activeHotIds = useMemo(() => {
+  // Targets ponderados por energia (gera “rio” para o top hot)
+  const hotTargets = useMemo(() => {
     if (!activeCat) return [];
-    return activeCat.items.filter((b) => b.state === "hot").map((b) => b.id);
+    return activeCat.items
+      .filter((b) => b.state === "hot")
+      .map((b) => ({ id: b.id, weight: Math.max(0.05, b.energy ** 2) })); // energy^2 enfatiza líder
   }, [activeCat]);
 
-  const activeCoolIds = useMemo(() => {
+  const coolTargets = useMemo(() => {
     if (!activeCat) return [];
-    return activeCat.items.filter((b) => b.state === "cool").map((b) => b.id);
+    return activeCat.items
+      .filter((b) => b.state === "cool")
+      .map((b) => ({ id: b.id, weight: Math.max(0.05, b.energy ** 1.4) }));
   }, [activeCat]);
 
   // origins A/B
@@ -149,37 +173,31 @@ export default function BubbleBoard() {
         items: cat.items.map((b) => {
           if (b.id !== id) return b;
           const nextEnergy = clamp01(b.energy + delta);
-
-          // trend derivado do delta (apenas para ripple/queda)
           const trend: Bubble["trend"] = delta > 0 ? 1 : delta < 0 ? -1 : 0;
-
-          // estado pode continuar vindo da simulação por enquanto;
-          // (quando você tiver dados reais, state virá do sinal)
           return { ...b, energy: nextEnergy, trend };
         }),
       }))
     );
   }, []);
 
-  // “decay” leve: se parar de receber bolhas, volta ao baseline do estado
+  // Decay leve para baseline por estado (se parar o fluxo, a bolha volta)
   useEffect(() => {
     const t = window.setInterval(() => {
       setData((prev) =>
         prev.map((cat) => ({
           ...cat,
           items: cat.items.map((b) => {
-            const baseline = b.state === "hot" ? 0.72 : b.state === "steady" ? 0.5 : 0.25;
-            const nextEnergy = clamp01(b.energy + (baseline - b.energy) * 0.06);
+            const baseline = b.state === "hot" ? 0.7 : b.state === "steady" ? 0.5 : 0.25;
+            const nextEnergy = clamp01(b.energy + (baseline - b.energy) * 0.05);
             return { ...b, energy: nextEnergy };
           }),
         }))
       );
     }, 250);
-
     return () => window.clearInterval(t);
   }, []);
 
-  // Simulação do estado (ainda útil no fake data)
+  // Simulação do estado (fake)
   const allIds = useMemo(() => data.flatMap((c) => c.items.map((b) => b.id)), [data]);
 
   useEffect(() => {
@@ -192,10 +210,8 @@ export default function BubbleBoard() {
           ...cat,
           items: cat.items.map((b) => {
             if (b.id !== pick) return b;
-
             const nextState: Bubble["state"] =
               b.state === "cool" ? "steady" : b.state === "steady" ? "hot" : "cool";
-
             return { ...b, state: nextState };
           }),
         }))
@@ -211,12 +227,12 @@ export default function BubbleBoard() {
         originA={origins.originA}
         originB={origins.originB}
         getTargetRectById={getTargetRectById}
-        hotIds={activeHotIds}
-        coolIds={activeCoolIds}
+        hotTargets={hotTargets}
+        coolTargets={coolTargets}
         onImpact={onImpact}
       />
 
-      {/* Menu/tabs (sem a mensagem de arrastar) */}
+      {/* Tabs */}
       <div className="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-gray-100">
         <div className="px-5 py-3">
           <div className="flex gap-2">
@@ -244,7 +260,7 @@ export default function BubbleBoard() {
         </div>
       </div>
 
-      {/* Pager horizontal */}
+      {/* Pager */}
       <div
         ref={viewportRef}
         onScroll={onScroll}
@@ -269,51 +285,58 @@ export default function BubbleBoard() {
               className="w-full flex-none snap-center px-5 pb-10"
               style={{ minHeight: "calc(100vh - 72px)" }}
             >
-              {/* distribuição melhor: grid centralizado */}
+              {/* Campo livre */}
               <div className="pt-6">
                 <div
-                  className={[
-                    "grid gap-4 place-items-center",
-                    // colunas ajustadas para mobile; fica “espalhado” em vez de fila
-                    "grid-cols-2",
-                  ].join(" ")}
+                  className="relative w-full"
+                  style={{
+                    height: "calc(100vh - 140px)",
+                    maxHeight: 640,
+                  }}
                 >
-                  {cat.items.map((b) => (
-                    <button
-                      key={b.id}
-                      ref={setBubbleEl(b.id)}
-                      type="button"
-                      className={[
-                        "bubble relative rounded-full border",
-                        "flex flex-col items-center justify-center",
-                        "shadow-sm active:scale-[0.98] transition",
-                        "select-none overflow-hidden",
-                        b.state === "hot" && "bubble-hot",
-                        b.state === "steady" && "bubble-steady",
-                        b.state === "cool" && "bubble-cool",
-                        b.trend === 1 && "bubble-rise",
-                        b.trend === -1 && "bubble-fall",
-                        sizeClasses(b.size),
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      style={
-                        {
-                          ["--e" as any]: b.energy,
-                          ["--t" as any]: b.trend,
-                        } as React.CSSProperties
-                      }
-                      aria-label={`${b.label} — ${stateLabel(b.state)}`}
-                      onClick={() => setSelectedId(b.id)}
-                    >
-                      <span className="relative z-10 font-medium leading-tight text-center px-2">
-                        {b.label}
-                      </span>
-                      <span className="relative z-10 mt-1 text-[10px] text-gray-600">
-                        {stateLabel(b.state)}
-                      </span>
-                    </button>
-                  ))}
+                  {cat.items.map((b) => {
+                    const pos = POSITIONS[cat.title][b.id] ?? { x: 50, y: 50 };
+
+                    return (
+                      <button
+                        key={b.id}
+                        ref={setBubbleEl(b.id)}
+                        type="button"
+                        className={[
+                          "bubble absolute rounded-full border",
+                          "flex flex-col items-center justify-center",
+                          "shadow-sm active:scale-[0.98] transition",
+                          "select-none overflow-hidden",
+                          b.state === "hot" && "bubble-hot",
+                          b.state === "steady" && "bubble-steady",
+                          b.state === "cool" && "bubble-cool",
+                          b.trend === 1 && "bubble-rise",
+                          b.trend === -1 && "bubble-fall",
+                          sizeClasses(b.size),
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        style={
+                          {
+                            left: `${pos.x}%`,
+                            top: `${pos.y}%`,
+                            transform: "translate(-50%, -50%)",
+                            ["--e" as any]: b.energy,
+                            ["--t" as any]: b.trend,
+                          } as React.CSSProperties
+                        }
+                        aria-label={`${b.label} — ${stateLabel(b.state)}`}
+                        onClick={() => setSelectedId(b.id)}
+                      >
+                        <span className="relative z-10 font-medium leading-tight text-center px-2">
+                          {b.label}
+                        </span>
+                        <span className="relative z-10 mt-1 text-[10px] text-gray-600">
+                          {stateLabel(b.state)}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </section>
