@@ -58,6 +58,7 @@ function asDetail(b: Bubble): TopicDetail {
 }
 
 function makeSeries(mode: "up" | "down") {
+  // Série fake (0..15min). Trocar por dados reais depois.
   const pts: { t: number; v: number }[] = [];
   let v = mode === "up" ? 0.35 : 0.7;
 
@@ -72,13 +73,14 @@ function makeSeries(mode: "up" | "down") {
 export default function BubbleBoard() {
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
 
+  // Tabs/pager (scroll horizontal entre categorias)
   const [activeIndex, setActiveIndex] = useState(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
   const goTo = useCallback((idx: number) => {
     const el = viewportRef.current;
     if (!el) return;
-    const w = el.clientWidth;
+    const w = el.clientWidth || 1;
     el.scrollTo({ left: idx * w, behavior: "smooth" });
     setActiveIndex(idx);
   }, []);
@@ -88,16 +90,19 @@ export default function BubbleBoard() {
     if (!el) return;
     const w = el.clientWidth || 1;
     const idx = Math.round(el.scrollLeft / w);
-    if (idx !== activeIndex) setActiveIndex(idx);
-  }, [activeIndex]);
+    setActiveIndex(idx);
+  }, []);
 
+  // Modal de detalhes (restaurado)
   const [selected, setSelected] = useState<TopicDetail | null>(null);
 
+  // Destaques (para partículas saírem do centro da bolha)
   const hotRef = useRef<HTMLButtonElement | null>(null);
   const coolRef = useRef<HTMLButtonElement | null>(null);
 
   const activeCat = data[activeIndex];
 
+  // Troca do par hot/cool (mais lento)
   const CHANGE_MS = 3800;
   const [pairTick, setPairTick] = useState(0);
 
@@ -109,12 +114,14 @@ export default function BubbleBoard() {
   const { hotBubble, coolBubble } = useMemo(() => {
     const items = activeCat?.items ?? [];
     if (items.length < 2) return { hotBubble: items[0], coolBubble: items[1] };
+
     return {
       hotBubble: items[pairTick % items.length],
       coolBubble: items[(pairTick + 1) % items.length],
     };
   }, [activeCat, pairTick]);
 
+  // Atualiza estados/energy: hot sobe, cool desce, resto volta pro baseline
   useEffect(() => {
     if (!activeCat || !hotBubble || !coolBubble) return;
 
@@ -127,8 +134,13 @@ export default function BubbleBoard() {
           return {
             ...cat,
             items: cat.items.map((b) => {
-              if (b.id === hotBubble.id) return { ...b, state: "hot", energy: clamp01(b.energy + 0.014), size: "md" };
-              if (b.id === coolBubble.id) return { ...b, state: "cool", energy: clamp01(b.energy - 0.011), size: "sm" };
+              if (b.id === hotBubble.id) {
+                return { ...b, state: "hot", energy: clamp01(b.energy + 0.014), size: "md" };
+              }
+              if (b.id === coolBubble.id) {
+                return { ...b, state: "cool", energy: clamp01(b.energy - 0.011), size: "sm" };
+              }
+
               const baseline = 0.5;
               return { ...b, state: "steady", energy: clamp01(b.energy + (baseline - b.energy) * 0.03) };
             }),
@@ -138,11 +150,13 @@ export default function BubbleBoard() {
     }, STEP_MS);
 
     return () => window.clearInterval(t);
-  }, [activeCat, activeIndex, hotBubble?.id, coolBubble?.id]);
+  }, [activeIndex, activeCat, hotBubble?.id, coolBubble?.id]);
 
+  // Séries do gráfico (independentes)
   const hotSeries = useMemo(() => makeSeries("up"), [pairTick, activeIndex]);
   const coolSeries = useMemo(() => makeSeries("down"), [pairTick, activeIndex]);
 
+  // Partículas (origem = bolha em destaque)
   const getHotRect = useCallback(() => hotRef.current?.getBoundingClientRect() ?? null, []);
   const getCoolRect = useCallback(() => coolRef.current?.getBoundingClientRect() ?? null, []);
 
@@ -180,11 +194,16 @@ export default function BubbleBoard() {
         </div>
       </div>
 
-      {/* Pager */}
+      {/* Pager horizontal */}
       <div
         ref={viewportRef}
         onScroll={onScroll}
-        className={["w-full overflow-x-auto", "snap-x snap-mandatory", "scroll-smooth", "[scrollbar-width:none] [-ms-overflow-style:none]"].join(" ")}
+        className={[
+          "w-full overflow-x-auto",
+          "snap-x snap-mandatory",
+          "scroll-smooth",
+          "[scrollbar-width:none] [-ms-overflow-style:none]",
+        ].join(" ")}
         style={{ WebkitOverflowScrolling: "touch" }}
       >
         <style jsx>{`
@@ -198,13 +217,18 @@ export default function BubbleBoard() {
             const items = cat.items;
             const isActive = cat.title === activeCat?.title;
 
+            // fallback simples quando não é a categoria ativa
             const hot = isActive ? hotBubble : items[0];
             const cool = isActive ? coolBubble : items[1];
 
             return (
-              <section key={cat.title} className="w-full flex-none snap-center px-5 pb-8" style={{ minHeight: "calc(100dvh - 72px)" }}>
+              <section
+                key={cat.title}
+                className="w-full flex-none snap-center px-5 pb-8"
+                style={{ minHeight: "calc(100dvh - 72px)" }}
+              >
                 <div className="pt-6 flex flex-col gap-4">
-                  {/* bolhas grandes */}
+                  {/* Bolhas grandes (somente 2) */}
                   <div className="flex justify-center gap-5">
                     <button
                       ref={isActive ? hotRef : undefined}
@@ -213,7 +237,9 @@ export default function BubbleBoard() {
                       className="bubble bubble-hot rounded-full border overflow-hidden flex flex-col items-center justify-center w-24 h-24"
                       style={{ ["--e" as any]: hot?.energy ?? 0.6 }}
                     >
-                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">{hot?.label ?? "—"}</div>
+                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">
+                        {hot?.label ?? "—"}
+                      </div>
                       <div className="text-[10px] text-gray-600 mt-1">Aquecendo</div>
                     </button>
 
@@ -224,20 +250,24 @@ export default function BubbleBoard() {
                       className="bubble bubble-cool rounded-full border overflow-hidden flex flex-col items-center justify-center w-24 h-24"
                       style={{ ["--e" as any]: cool?.energy ?? 0.4 }}
                     >
-                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">{cool?.label ?? "—"}</div>
+                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">
+                        {cool?.label ?? "—"}
+                      </div>
                       <div className="text-[10px] text-gray-600 mt-1">Esfriando</div>
                     </button>
                   </div>
 
-                  {/* gráficos independentes (empilhados) */}
-                  <div className="flex flex-col gap-3">
+                  {/* Gráficos independentes (empilhados e próximos)
+                      - o primeiro sem eixo X para parecer um bloco só */}
+                  <div className="flex flex-col gap-1">
                     <TrendChartSingle
                       now={new Date()}
                       name={hot?.label ?? "Quente"}
                       direction="up"
                       color="var(--hot-br)"
                       points={hotSeries}
-                      height={155}
+                      height={145}
+                      showXAxis={false}
                     />
                     <TrendChartSingle
                       now={new Date()}
@@ -246,10 +276,11 @@ export default function BubbleBoard() {
                       color="var(--cool-br)"
                       points={coolSeries}
                       height={155}
+                      showXAxis
                     />
                   </div>
 
-                  {/* grid de bolhas */}
+                  {/* Grid de bolhas (todas) */}
                   <div className="pt-1">
                     <div className="flex flex-wrap gap-3 justify-center">
                       {items.map((b) => (
