@@ -58,10 +58,11 @@ function asDetail(b: Bubble): TopicDetail {
 }
 
 function makeSeries(up: boolean) {
+  // 15 pontos (0..15)
   const pts: { t: number; v: number }[] = [];
   let v = up ? 0.35 : 0.7;
-  for (let i = 0; i <= 10; i++) {
-    v = clamp01(v + (up ? 0.03 : -0.03) + (Math.random() * 0.06 - 0.03));
+  for (let i = 0; i <= 15; i++) {
+    v = clamp01(v + (up ? 0.02 : -0.02) + (Math.random() * 0.06 - 0.03));
     pts.push({ t: i, v });
   }
   return pts;
@@ -99,8 +100,7 @@ export default function BubbleBoard() {
 
   const activeCat = data[activeIndex];
 
-  // mais lento: 3.5s (ajuste aqui)
-  const CHANGE_MS = 3500;
+  const CHANGE_MS = 3800; // mais lento (ajuste fino aqui)
 
   const [pairTick, setPairTick] = useState(0);
   useEffect(() => {
@@ -108,20 +108,24 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, []);
 
-  const { hotBubble, coolBubble } = useMemo(() => {
+  const { hotBubble, coolBubble, steadyBubble } = useMemo(() => {
     const items = activeCat?.items ?? [];
-    if (items.length < 2) return { hotBubble: items[0], coolBubble: items[1] };
+    if (items.length < 3) {
+      return { hotBubble: items[0], coolBubble: items[1], steadyBubble: items[2] };
+    }
 
     const hot = items[pairTick % items.length];
     const cool = items[(pairTick + 1) % items.length];
-    return { hotBubble: hot, coolBubble: cool };
+    // escolhe uma terceira diferente (a próxima)
+    const steady = items[(pairTick + 2) % items.length];
+
+    return { hotBubble: hot, coolBubble: cool, steadyBubble: steady };
   }, [activeCat, pairTick]);
 
-  // energia: também pode ficar um pouco mais suave agora que troca mais devagar
   useEffect(() => {
-    if (!activeCat || !hotBubble || !coolBubble) return;
+    if (!activeCat || !hotBubble || !coolBubble || !steadyBubble) return;
 
-    const STEP_MS = 110;
+    const STEP_MS = 120;
     const t = window.setInterval(() => {
       setData((prev) =>
         prev.map((cat, idx) => {
@@ -131,16 +135,26 @@ export default function BubbleBoard() {
             ...cat,
             items: cat.items.map((b) => {
               if (b.id === hotBubble.id) {
-                return { ...b, state: "hot", energy: clamp01(b.energy + 0.015), size: "md" };
+                return { ...b, state: "hot", energy: clamp01(b.energy + 0.014), size: "md" };
               }
               if (b.id === coolBubble.id) {
-                return { ...b, state: "cool", energy: clamp01(b.energy - 0.012), size: "sm" };
+                return { ...b, state: "cool", energy: clamp01(b.energy - 0.011), size: "sm" };
               }
+              if (b.id === steadyBubble.id) {
+                const baseline = 0.52;
+                return {
+                  ...b,
+                  state: "steady",
+                  energy: clamp01(b.energy + (baseline - b.energy) * 0.06),
+                  size: "sm",
+                };
+              }
+
               const baseline = 0.5;
               return {
                 ...b,
                 state: "steady",
-                energy: clamp01(b.energy + (baseline - b.energy) * 0.035),
+                energy: clamp01(b.energy + (baseline - b.energy) * 0.03),
               };
             }),
           };
@@ -149,7 +163,7 @@ export default function BubbleBoard() {
     }, STEP_MS);
 
     return () => window.clearInterval(t);
-  }, [activeCat, activeIndex, hotBubble?.id, coolBubble?.id]);
+  }, [activeCat, activeIndex, hotBubble?.id, coolBubble?.id, steadyBubble?.id]);
 
   const hotSeries = useMemo(() => makeSeries(true), [pairTick, activeIndex]);
   const coolSeries = useMemo(() => makeSeries(false), [pairTick, activeIndex]);
@@ -182,7 +196,10 @@ export default function BubbleBoard() {
                 <button
                   key={cat.title}
                   type="button"
-                  onClick={() => goTo(idx)}
+                  onClick={() => {
+                    goTo(idx);
+                    setPairTick(0);
+                  }}
                   className={[
                     "px-3 py-2 rounded-full text-xs font-semibold tracking-widest",
                     "transition border",
@@ -221,8 +238,11 @@ export default function BubbleBoard() {
         <div className="flex w-full">
           {data.map((cat) => {
             const items = cat.items;
-            const hot = hotBubble && cat.title === activeCat?.title ? hotBubble : items[0];
-            const cool = coolBubble && cat.title === activeCat?.title ? coolBubble : items[1];
+            const isActive = cat.title === activeCat?.title;
+
+            const hot = isActive ? hotBubble : items[0];
+            const cool = isActive ? coolBubble : items[1];
+            const steady = isActive ? steadyBubble : items[2];
 
             return (
               <section
@@ -231,44 +251,60 @@ export default function BubbleBoard() {
                 style={{ minHeight: "calc(100dvh - 72px)" }}
               >
                 <div className="pt-6 flex flex-col gap-5">
-                  {/* 2 bolhas grandes mais centralizadas */}
-                  <div className="flex justify-center gap-6">
+                  {/* 3 bolhas principais (menores) */}
+                  <div className="flex justify-center gap-4">
                     <button
-                      ref={cat.title === activeCat?.title ? hotRef : undefined}
+                      ref={isActive ? hotRef : undefined}
                       type="button"
                       onClick={() => hot && setSelected(asDetail(hot))}
                       className={[
                         "bubble bubble-hot rounded-full border overflow-hidden",
                         "flex flex-col items-center justify-center",
-                        "w-28 h-28",
+                        "w-24 h-24",
                       ].join(" ")}
                       style={{ ["--e" as any]: hot?.energy ?? 0.6 }}
                     >
-                      <div className="font-semibold text-sm px-2 text-center leading-tight">
+                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">
                         {hot?.label ?? "—"}
                       </div>
-                      <div className="text-[10px] text-gray-600 mt-1">Aquecendo</div>
+                      <div className="text-[10px] text-gray-600 mt-1">Quente</div>
                     </button>
 
                     <button
-                      ref={cat.title === activeCat?.title ? coolRef : undefined}
+                      ref={isActive ? coolRef : undefined}
                       type="button"
                       onClick={() => cool && setSelected(asDetail(cool))}
                       className={[
                         "bubble bubble-cool rounded-full border overflow-hidden",
                         "flex flex-col items-center justify-center",
-                        "w-28 h-28",
+                        "w-24 h-24",
                       ].join(" ")}
                       style={{ ["--e" as any]: cool?.energy ?? 0.4 }}
                     >
-                      <div className="font-semibold text-sm px-2 text-center leading-tight">
+                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">
                         {cool?.label ?? "—"}
                       </div>
-                      <div className="text-[10px] text-gray-600 mt-1">Esfriando</div>
+                      <div className="text-[10px] text-gray-600 mt-1">Frio</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => steady && setSelected(asDetail(steady))}
+                      className={[
+                        "bubble bubble-steady rounded-full border overflow-hidden",
+                        "flex flex-col items-center justify-center",
+                        "w-24 h-24",
+                      ].join(" ")}
+                      style={{ ["--e" as any]: steady?.energy ?? 0.5 }}
+                    >
+                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">
+                        {steady?.label ?? "—"}
+                      </div>
+                      <div className="text-[10px] text-gray-600 mt-1">Estável</div>
                     </button>
                   </div>
 
-                  {/* Gráfico: sem borda, com horas e eixo Y à direita */}
+                  {/* Gráfico 15 min (2 linhas) */}
                   <TrendChart hotSeries={hotSeries} coolSeries={coolSeries} now={new Date()} />
 
                   {/* Todas as bolhas menores */}
