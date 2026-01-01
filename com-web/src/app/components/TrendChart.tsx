@@ -1,7 +1,6 @@
 "use client";
 
 type Point = { t: number; v: number }; // t: minutos (0..15), v: 0..1
-type Dir = "up" | "down";
 
 function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
@@ -44,10 +43,6 @@ function boostedPercent(points: Point[], boost = 2.4) {
   return Math.max(0, Math.min(100, Math.round(delta * 100 * boost)));
 }
 
-function arrow(dir: Dir) {
-  return dir === "up" ? "↑" : "↓";
-}
-
 export default function TrendChart({
   hot,
   cool,
@@ -75,49 +70,48 @@ export default function TrendChart({
   const hotPct = boostedPercent(hot.points, 2.4);
   const coolPct = boostedPercent(cool.points, 2.4);
 
-  // Eixo X 4 tempos
+  // eixo X 4 tempos
   const t15 = new Date(now.getTime() - 15 * 60 * 1000);
   const t10 = new Date(now.getTime() - 10 * 60 * 1000);
   const t5 = new Date(now.getTime() - 5 * 60 * 1000);
   const t0 = now;
 
-  // Card fixo à direita (X), Y segue o ponto final
+  // “final do gráfico” (borda direita do plot)
+  const endX = xAt(15, width, pad);
+
+  // cards alinhados à direita (X fixo)
   const cardW = 128;
   const cardH = 38;
-  const cardX = width - pad - cardW; // alinhado à direita
+  const cardX = width - pad - cardW;
 
-  // Anti-overlap
-  const tooClose = Math.abs(hotY0 - coolY0) < cardH + 8;
-  let hotY = hotY0;
-  let coolY = coolY0;
+  // Y segue o ponto, mas sem empurrar para gerar linhas “voltando”:
+  // só um ajuste pequeno anti-overlap (mantém sensação de final)
+  const minY = pad + cardH / 2;
+  const maxY = height - pad - 14 - cardH / 2;
 
-  if (tooClose) {
-    if (hotY0 <= coolY0) {
-      hotY = hotY0 - (cardH / 2 + 6);
-      coolY = coolY0 + (cardH / 2 + 6);
+  let hotY = Math.max(minY, Math.min(maxY, hotY0));
+  let coolY = Math.max(minY, Math.min(maxY, coolY0));
+
+  const overlap = Math.abs(hotY - coolY) < cardH + 6;
+  if (overlap) {
+    // empurra minimamente, mas não “teleporta”
+    if (hotY <= coolY) {
+      hotY = Math.max(minY, hotY - 10);
+      coolY = Math.min(maxY, coolY + 10);
     } else {
-      hotY = hotY0 + (cardH / 2 + 6);
-      coolY = coolY0 - (cardH / 2 + 6);
+      hotY = Math.min(maxY, hotY + 10);
+      coolY = Math.max(minY, coolY - 10);
     }
   }
 
-  // Clamp (considera espaço do eixo X)
-  const minY = pad + cardH / 2;
-  const maxY = height - pad - 14 - cardH / 2;
-  hotY = Math.max(minY, Math.min(maxY, hotY));
-  coolY = Math.max(minY, Math.min(maxY, coolY));
-
-  // ponto final (x)
-  const endX = xAt(15, width, pad);
-
-  // leader line: vai até a borda esquerda do card
-  const leadToX = cardX - 6;
+  // marcador “tick” curto no final (não atravessa o gráfico)
+  const tickH = 14;
 
   return (
     <div className="w-full">
       <div className="w-full rounded-xl bg-white/70 px-2 py-2">
         <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-          {/* grid horizontal leve */}
+          {/* grid leve */}
           <g opacity="0.75">
             {[0.2, 0.5, 0.8].map((v) => {
               const y = yAt(v, height, pad);
@@ -129,55 +123,52 @@ export default function TrendChart({
           <path d={coolPath} fill="none" stroke="var(--cool-br)" strokeWidth="2.2" />
           <path d={hotPath} fill="none" stroke="var(--hot-br)" strokeWidth="2.2" />
 
-          {/* leader lines (pontilhadas) do último ponto até o card */}
+          {/* ticks curtos no final (ancora visual) */}
           <line
             x1={endX}
-            y1={hotY0}
-            x2={leadToX}
-            y2={hotY}
+            y1={hotY0 - tickH / 2}
+            x2={endX}
+            y2={hotY0 + tickH / 2}
             stroke="var(--hot-br)"
-            strokeWidth="1.5"
-            strokeDasharray="3 4"
-            opacity="0.75"
+            strokeWidth="4"
+            strokeLinecap="round"
+            opacity="0.85"
           />
           <line
             x1={endX}
-            y1={coolY0}
-            x2={leadToX}
-            y2={coolY}
+            y1={coolY0 - tickH / 2}
+            x2={endX}
+            y2={coolY0 + tickH / 2}
             stroke="var(--cool-br)"
-            strokeWidth="1.5"
-            strokeDasharray="3 4"
-            opacity="0.75"
+            strokeWidth="4"
+            strokeLinecap="round"
+            opacity="0.85"
           />
 
           {/* pontos finais */}
           <circle cx={endX} cy={coolY0} r="3.6" fill="var(--cool-br)" />
           <circle cx={endX} cy={hotY0} r="3.6" fill="var(--hot-br)" />
 
-          {/* HOT card */}
+          {/* cards colados à direita (sem leader line) */}
           <g transform={`translate(${cardX}, ${hotY - cardH / 2})`}>
-            <rect x={0} y={0} width={cardW} height={cardH} rx={10} fill="rgba(255,255,255,0.90)" />
+            <rect x={0} y={0} width={cardW} height={cardH} rx={10} fill="rgba(255,255,255,0.92)" />
             <rect x={0} y={0} width={4} height={cardH} rx={10} fill="var(--hot-br)" />
             <text x={10} y={15} fontSize="10" fill="#374151">
               {hot.name}
             </text>
             <text x={10} y={31} fontSize="13" fill="var(--hot-br)" fontWeight={800}>
-              {arrow("up")}
-              {hotPct}%
+              ↑{hotPct}%
             </text>
           </g>
 
-          {/* COOL card */}
           <g transform={`translate(${cardX}, ${coolY - cardH / 2})`}>
-            <rect x={0} y={0} width={cardW} height={cardH} rx={10} fill="rgba(255,255,255,0.90)" />
+            <rect x={0} y={0} width={cardW} height={cardH} rx={10} fill="rgba(255,255,255,0.92)" />
             <rect x={0} y={0} width={4} height={cardH} rx={10} fill="var(--cool-br)" />
             <text x={10} y={15} fontSize="10" fill="#374151">
               {cool.name}
             </text>
             <text x={10} y={31} fontSize="13" fill="var(--cool-br)" fontWeight={800}>
-              {arrow("down")}
-              {coolPct}%
+              ↓{coolPct}%
             </text>
           </g>
 
