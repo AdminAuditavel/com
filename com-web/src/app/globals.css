@@ -76,77 +76,64 @@ body {
   animation: pulseSoft 3s ease-in-out infinite;
 }
 
-/* Comentaram — “dados” (partículas) entrando/saindo nas bolhas */
-@keyframes dataIn {
+/* Comentaram — efeito “reactions” (estilo YouTube) */
+
+@keyframes floatUpFade {
   0% {
-    transform: translate(var(--dx), var(--dy)) scale(1);
+    transform: translateY(0) scale(0.9);
     opacity: 0;
   }
-  20% {
+  10% {
     opacity: 0.85;
   }
   100% {
-    transform: translate(0px, 0px) scale(0.55);
+    transform: translateY(-52px) scale(1.15);
     opacity: 0;
   }
 }
 
-@keyframes dataOut {
+@keyframes driftInFade {
   0% {
-    transform: translate(0px, 0px) scale(0.55);
-    opacity: 0;
-  }
-  20% {
-    opacity: 0.7;
-  }
-  100% {
     transform: translate(var(--dx), var(--dy)) scale(1);
     opacity: 0;
   }
+  15% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(0px, 0px) scale(0.7);
+    opacity: 0;
+  }
 }
 
-/* Base para permitir pseudo-elementos */
-.bubble {
-  position: relative;
-  overflow: hidden; /* mantém partículas dentro do círculo */
-}
-
-/* Partículas: usamos 1 pseudo-elemento com vários “pontos” via box-shadow */
-.bubble::after {
-  content: "";
+.reaction-layer {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: currentColor;
-  opacity: 0;
-  transform: translate(0, 0);
+  inset: 0;
   pointer-events: none;
-
-  /* “Pacote” de pontos (um vira vários) */
-  box-shadow:
-    -22px -10px 0 0 currentColor,
-    18px -18px 0 0 currentColor,
-    -16px 18px 0 0 currentColor,
-    22px 12px 0 0 currentColor,
-    0px -24px 0 0 currentColor,
-    0px 24px 0 0 currentColor;
+  overflow: hidden;
+  border-radius: 9999px;
 }
 
-/* ENTRANDO (hot): pontos vêm da borda para o centro */
-.bubble-hot::after {
-  --dx: 0px;
-  --dy: 0px;
-  animation: dataIn 1.4s ease-in-out infinite;
-  animation-delay: 0.1s;
+.reaction {
+  position: absolute;
+  left: var(--x);
+  bottom: 18px; /* usado no floatUp */
+  font-size: var(--s);
+  line-height: 1;
+  opacity: 0;
+  will-change: transform, opacity;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.08));
 }
 
-/* SAINDO (cool): pontos saem do centro para a borda */
-.bubble-cool::after {
-  --dx: 0px;
-  --dy: 0px;
-  animation: dataOut 1.6s ease-in-out infinite;
-  animation-delay: 0.15s;
+/* “saindo”: sobe e some */
+.reaction--out {
+  animation: floatUpFade var(--dur) ease-out forwards;
+}
+
+/* “entrando”: vem de fora para o centro e some */
+.reaction--in {
+  top: 50%;
+  left: 50%;
+  transform: translate(var(--dx), var(--dy));
+  animation: driftInFade var(--dur) ease-in-out forwards;
 }
