@@ -1,3 +1,4 @@
+
 "use client";
 
 type Point = { t: number; v: number }; // t: minutos (0..10), v: 0..1
@@ -6,9 +7,9 @@ function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
-function pointsToPath(points: Point[], w: number, h: number, pad: number) {
+function pointsToPath(points: Point[], w: number, h: number, pad: number, rightPad: number) {
   if (points.length === 0) return "";
-  const innerW = w - pad * 2;
+  const innerW = w - pad - rightPad;
   const innerH = h - pad * 2;
 
   const toX = (t: number) => pad + (t / 10) * innerW;
@@ -19,21 +20,37 @@ function pointsToPath(points: Point[], w: number, h: number, pad: number) {
     .join(" ");
 }
 
+function fmtTime(d: Date) {
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
 export default function TrendChart({
   hotSeries,
   coolSeries,
   width = 340,
   height = 110,
+  now = new Date(),
 }: {
   hotSeries: Point[];
   coolSeries: Point[];
   width?: number;
   height?: number;
+  now?: Date;
 }) {
   const pad = 10;
+  const rightPad = 34; // espaço para labels do eixo Y à direita
 
-  const hotPath = pointsToPath(hotSeries, width, height, pad);
-  const coolPath = pointsToPath(coolSeries, width, height, pad);
+  const hotPath = pointsToPath(hotSeries, width, height, pad, rightPad);
+  const coolPath = pointsToPath(coolSeries, width, height, pad, rightPad);
+
+  // horários: agora, -5, -10
+  const t10 = new Date(now.getTime() - 10 * 60 * 1000);
+  const t5 = new Date(now.getTime() - 5 * 60 * 1000);
+  const t0 = now;
+
+  const plotRightX = width - rightPad;
 
   return (
     <div className="w-full">
@@ -57,7 +74,8 @@ export default function TrendChart({
         </div>
       </div>
 
-      <div className="w-full rounded-xl border border-gray-200 bg-white/70 px-2 py-2">
+      {/* Sem contorno (sem border) */}
+      <div className="w-full rounded-xl bg-white/70 px-2 py-2">
         <svg
           width="100%"
           height={height}
@@ -66,7 +84,7 @@ export default function TrendChart({
           aria-label="Gráfico dos últimos 10 minutos"
         >
           {/* grid leve */}
-          <g opacity="0.8">
+          <g opacity="0.75">
             {[0, 0.5, 1].map((v) => {
               const y = pad + (1 - v) * (height - pad * 2);
               return (
@@ -74,7 +92,7 @@ export default function TrendChart({
                   key={v}
                   x1={pad}
                   y1={y}
-                  x2={width - pad}
+                  x2={plotRightX}
                   y2={y}
                   stroke="#e5e7eb"
                   strokeWidth="1"
@@ -83,16 +101,16 @@ export default function TrendChart({
             })}
           </g>
 
-          {/* eixo X: -10m, -5m, agora */}
+          {/* eixo Y à direita (0%..100%) */}
           <g fill="#6b7280" fontSize="10">
-            <text x={pad} y={height - 2}>
-              -10m
+            <text x={plotRightX + 6} y={pad + 3}>
+              100%
             </text>
-            <text x={width / 2 - 10} y={height - 2}>
-              -5m
+            <text x={plotRightX + 6} y={pad + (height - pad * 2) / 2 + 3}>
+              50%
             </text>
-            <text x={width - pad - 18} y={height - 2}>
-              agora
+            <text x={plotRightX + 6} y={height - pad}>
+              0%
             </text>
           </g>
 
@@ -103,7 +121,7 @@ export default function TrendChart({
           {/* pontos finais */}
           {hotSeries.length > 0 && (
             <circle
-              cx={width - pad}
+              cx={plotRightX}
               cy={pad + (1 - hotSeries[hotSeries.length - 1]!.v) * (height - pad * 2)}
               r="3.5"
               fill="var(--hot-br)"
@@ -111,12 +129,25 @@ export default function TrendChart({
           )}
           {coolSeries.length > 0 && (
             <circle
-              cx={width - pad}
+              cx={plotRightX}
               cy={pad + (1 - coolSeries[coolSeries.length - 1]!.v) * (height - pad * 2)}
               r="3.5"
               fill="var(--cool-br)"
             />
           )}
+
+          {/* eixo X com horas */}
+          <g fill="#6b7280" fontSize="10">
+            <text x={pad} y={height - 2}>
+              {fmtTime(t10)}
+            </text>
+            <text x={width / 2 - 12} y={height - 2}>
+              {fmtTime(t5)}
+            </text>
+            <text x={plotRightX - 22} y={height - 2}>
+              {fmtTime(t0)}
+            </text>
+          </g>
         </svg>
       </div>
     </div>
