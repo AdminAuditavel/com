@@ -58,7 +58,6 @@ function asDetail(b: Bubble): TopicDetail {
 }
 
 function makeSeries(up: boolean) {
-  // série fake: 10 pontos em 10 minutos (0..10), v 0..1
   const pts: { t: number; v: number }[] = [];
   let v = up ? 0.35 : 0.7;
   for (let i = 0; i <= 10; i++) {
@@ -94,20 +93,21 @@ export default function BubbleBoard() {
   // modal
   const [selected, setSelected] = useState<TopicDetail | null>(null);
 
-  // refs das bolhas em destaque (para origem das partículas)
+  // refs das bolhas em destaque
   const hotRef = useRef<HTMLButtonElement | null>(null);
   const coolRef = useRef<HTMLButtonElement | null>(null);
 
   const activeCat = data[activeIndex];
 
-  // alternância de “par” a cada 1.5s (1–2s)
+  // mais lento: 3.5s (ajuste aqui)
+  const CHANGE_MS = 3500;
+
   const [pairTick, setPairTick] = useState(0);
   useEffect(() => {
-    const t = window.setInterval(() => setPairTick((x) => x + 1), 1500);
+    const t = window.setInterval(() => setPairTick((x) => x + 1), CHANGE_MS);
     return () => window.clearInterval(t);
   }, []);
 
-  // escolhe hot/cool da categoria ativa (fake: alterna por índice)
   const { hotBubble, coolBubble } = useMemo(() => {
     const items = activeCat?.items ?? [];
     if (items.length < 2) return { hotBubble: items[0], coolBubble: items[1] };
@@ -117,11 +117,11 @@ export default function BubbleBoard() {
     return { hotBubble: hot, coolBubble: cool };
   }, [activeCat, pairTick]);
 
-  // atualiza states/energy só para os dois focos (o resto relaxa)
+  // energia: também pode ficar um pouco mais suave agora que troca mais devagar
   useEffect(() => {
     if (!activeCat || !hotBubble || !coolBubble) return;
 
-    const STEP_MS = 90;
+    const STEP_MS = 110;
     const t = window.setInterval(() => {
       setData((prev) =>
         prev.map((cat, idx) => {
@@ -131,14 +131,17 @@ export default function BubbleBoard() {
             ...cat,
             items: cat.items.map((b) => {
               if (b.id === hotBubble.id) {
-                return { ...b, state: "hot", energy: clamp01(b.energy + 0.02), size: "md" };
+                return { ...b, state: "hot", energy: clamp01(b.energy + 0.015), size: "md" };
               }
               if (b.id === coolBubble.id) {
-                return { ...b, state: "cool", energy: clamp01(b.energy - 0.016), size: "sm" };
+                return { ...b, state: "cool", energy: clamp01(b.energy - 0.012), size: "sm" };
               }
-              // baseline
               const baseline = 0.5;
-              return { ...b, state: "steady", energy: clamp01(b.energy + (baseline - b.energy) * 0.04) };
+              return {
+                ...b,
+                state: "steady",
+                energy: clamp01(b.energy + (baseline - b.energy) * 0.035),
+              };
             }),
           };
         })
@@ -148,7 +151,6 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, [activeCat, activeIndex, hotBubble?.id, coolBubble?.id]);
 
-  // gráfico (fake por enquanto) — troca junto do par
   const hotSeries = useMemo(() => makeSeries(true), [pairTick, activeIndex]);
   const coolSeries = useMemo(() => makeSeries(false), [pairTick, activeIndex]);
 
@@ -157,7 +159,6 @@ export default function BubbleBoard() {
 
   return (
     <>
-      {/* Partículas nascendo da bolha */}
       <BubbleParticles
         active={!!hotBubble}
         direction="up"
@@ -229,9 +230,9 @@ export default function BubbleBoard() {
                 className="w-full flex-none snap-center px-5 pb-8"
                 style={{ minHeight: "calc(100dvh - 72px)" }}
               >
-                {/* Destaque (2 bolhas) */}
-                <div className="pt-5 flex flex-col gap-4">
-                  <div className="flex items-center justify-between gap-4">
+                <div className="pt-6 flex flex-col gap-5">
+                  {/* 2 bolhas grandes mais centralizadas */}
+                  <div className="flex justify-center gap-6">
                     <button
                       ref={cat.title === activeCat?.title ? hotRef : undefined}
                       type="button"
@@ -267,11 +268,11 @@ export default function BubbleBoard() {
                     </button>
                   </div>
 
-                  {/* Gráfico 2 linhas */}
-                  <TrendChart hotSeries={hotSeries} coolSeries={coolSeries} />
+                  {/* Gráfico: sem borda, com horas e eixo Y à direita */}
+                  <TrendChart hotSeries={hotSeries} coolSeries={coolSeries} now={new Date()} />
 
-                  {/* Todas as bolhas (menores) */}
-                  <div className="pt-2">
+                  {/* Todas as bolhas menores */}
+                  <div className="pt-1">
                     <div className="flex flex-wrap gap-3 justify-center">
                       {items.map((b) => (
                         <button
