@@ -49,20 +49,20 @@ type BubblePos = { x: number; y: number }; // percent
 
 const POSITIONS: Record<CategoryBlock["title"], Record<string, BubblePos>> = {
   ESPORTES: {
-    flamengo: { x: 58, y: 40 },
-    palmeiras: { x: 36, y: 34 },
-    corinthians: { x: 42, y: 58 },
-    selecao: { x: 30, y: 70 },
-    ufc: { x: 70, y: 58 },
-    mcgregor: { x: 58, y: 72 },
-    "futebol-mundial": { x: 46, y: 72 },
+    flamengo: { x: 58, y: 42 },
+    palmeiras: { x: 34, y: 34 },
+    corinthians: { x: 40, y: 60 },
+    selecao: { x: 28, y: 72 },
+    ufc: { x: 72, y: 58 },
+    mcgregor: { x: 60, y: 72 },
+    "futebol-mundial": { x: 48, y: 74 },
   },
   POLÍTICA: {
-    presidencia: { x: 56, y: 42 },
-    stf: { x: 34, y: 44 },
-    congresso: { x: 72, y: 50 },
-    "eleicoes-2026": { x: 44, y: 68 },
-    "gastos-publicos": { x: 60, y: 72 },
+    presidencia: { x: 56, y: 44 },
+    stf: { x: 34, y: 46 },
+    congresso: { x: 72, y: 52 },
+    "eleicoes-2026": { x: 44, y: 70 },
+    "gastos-publicos": { x: 60, y: 74 },
   },
 };
 
@@ -108,7 +108,7 @@ export default function BubbleBoard() {
     if (idx !== activeIndex) setActiveIndex(idx);
   }, [activeIndex]);
 
-  // refs DOMRect
+  // refs para DOMRect (agora no botão-anchor)
   const bubbleElsRef = useRef(new Map<string, HTMLButtonElement | null>());
   const setBubbleEl = useCallback((id: string) => {
     return (el: HTMLButtonElement | null) => {
@@ -219,7 +219,7 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, [allIds]);
 
-  // SAFE area (menos restrita, mas ainda evita cortar)
+  // Área segura (centros)
   const SAFE_X_MIN = 16;
   const SAFE_X_MAX = 84;
   const SAFE_Y_MIN = 18;
@@ -263,7 +263,7 @@ export default function BubbleBoard() {
         </div>
       </div>
 
-      {/* Pager (horizontal) */}
+      {/* Pager horizontal */}
       <div
         ref={viewportRef}
         onScroll={onScroll}
@@ -288,60 +288,63 @@ export default function BubbleBoard() {
               className="w-full flex-none snap-center px-5"
               style={{ height: "calc(100dvh - 72px)" }}
             >
-              {/* Campo: uma tela, denso */}
               <div
                 className="relative w-full"
                 style={{
                   height: "calc(100dvh - 120px)",
-                  overflow: "visible",
-                  // DEBUG (opcional): descomente pra ver a área do campo
-                  // outline: "1px dashed rgba(148,163,184,0.6)",
+                  // debug se precisar:
+                  // outline: "1px dashed rgba(148,163,184,0.7)",
                 }}
               >
                 {cat.items.map((b) => {
                   const raw = POSITIONS[cat.title][b.id] ?? { x: 50, y: 50 };
-                  const pos = {
-                    x: clamp(raw.x, SAFE_X_MIN, SAFE_X_MAX),
-                    y: clamp(raw.y, SAFE_Y_MIN, SAFE_Y_MAX),
-                  };
+                  const x = clamp(raw.x, SAFE_X_MIN, SAFE_X_MAX);
+                  const y = clamp(raw.y, SAFE_Y_MIN, SAFE_Y_MAX);
 
                   return (
                     <button
                       key={b.id}
                       ref={setBubbleEl(b.id)}
                       type="button"
-                      className={[
-                        "bubble absolute rounded-full border",
-                        "flex flex-col items-center justify-center",
-                        "shadow-sm active:scale-[0.98] transition",
-                        "select-none overflow-hidden",
-                        b.state === "hot" && "bubble-hot",
-                        b.state === "steady" && "bubble-steady",
-                        b.state === "cool" && "bubble-cool",
-                        b.trend === 1 && "bubble-rise",
-                        b.trend === -1 && "bubble-fall",
-                        sizeClasses(b.size),
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      style={
-                        {
-                          left: `${pos.x}%`,
-                          top: `${pos.y}%`,
-                          transform: "translate(-50%, -50%)",
-                          ["--e" as any]: b.energy,
-                          ["--t" as any]: b.trend,
-                        } as React.CSSProperties
-                      }
-                      aria-label={`${b.label} — ${stateLabel(b.state)}`}
+                      className="absolute select-none"
+                      style={{
+                        left: `${x}%`,
+                        top: `${y}%`,
+                        transform: "translate(-50%, -50%)",
+                      }}
                       onClick={() => setSelectedId(b.id)}
+                      aria-label={`${b.label} — ${stateLabel(b.state)}`}
                     >
-                      <span className="relative z-10 font-medium leading-tight text-center px-2">
-                        {b.label}
-                      </span>
-                      <span className="relative z-10 mt-1 text-[10px] text-gray-600">
-                        {stateLabel(b.state)}
-                      </span>
+                      {/* O “corpo” da bolha anima transform sem quebrar posicionamento */}
+                      <div
+                        className={[
+                          "bubble rounded-full border",
+                          "flex flex-col items-center justify-center",
+                          "shadow-sm active:scale-[0.98] transition",
+                          "overflow-hidden",
+                          b.state === "hot" && "bubble-hot",
+                          b.state === "steady" && "bubble-steady",
+                          b.state === "cool" && "bubble-cool",
+                          b.trend === 1 && "bubble-rise",
+                          b.trend === -1 && "bubble-fall",
+                          sizeClasses(b.size),
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        style={
+                          {
+                            ["--e" as any]: b.energy,
+                            ["--t" as any]: b.trend,
+                          } as React.CSSProperties
+                        }
+                      >
+                        <span className="relative z-10 font-medium leading-tight text-center px-2">
+                          {b.label}
+                        </span>
+                        <span className="relative z-10 mt-1 text-[10px] text-gray-600">
+                          {stateLabel(b.state)}
+                        </span>
+                      </div>
                     </button>
                   );
                 })}
