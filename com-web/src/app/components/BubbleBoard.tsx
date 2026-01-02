@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import ReactDOM from "react-dom";
 import TopicModal, { type TopicDetail } from "@/app/components/TopicModal";
 
 type Bubble = {
@@ -57,9 +58,9 @@ function stateLabel(s: Bubble["state"]) {
 }
 
 function stateAccent(s: Bubble["state"]) {
-  if (s === "hot") return { bg: "bg-orange-50", border: "border-orange-200" };
-  if (s === "cool") return { bg: "bg-sky-50", border: "border-sky-200" };
-  return { bg: "bg-white", border: "border-slate-200" };
+  if (s === "hot") return { bg: "bg-orange-50", border: "border-orange-200", ring: "ring-orange-200" };
+  if (s === "cool") return { bg: "bg-sky-50", border: "border-sky-200", ring: "ring-sky-200" };
+  return { bg: "bg-white", border: "border-slate-200", ring: "ring-slate-200" };
 }
 
 function formatDeltaPct(v?: number) {
@@ -292,15 +293,12 @@ export default function BubbleBoard() {
     return m;
   }, [flatList]);
 
-  // ===== Sticky featured =====
+  // ===== Sticky featured (scroll da JANELA, sem overflow interno) =====
   const [featuredId, setFeaturedId] = useState<string | null>(null);
-
   const stickyRef = useRef<HTMLDivElement | null>(null);
-  const listRef = useRef<HTMLDivElement | null>(null);
   const cardElsRef = useRef<Record<string, HTMLDivElement | null>>({});
   const rafRef = useRef<number | null>(null);
 
-  // altura real do sticky + spacer dinâmico
   const [stickyH, setStickyH] = useState<number>(280);
 
   useEffect(() => {
@@ -317,7 +315,6 @@ export default function BubbleBoard() {
     });
     ro.observe(el);
 
-    // set inicial
     const h0 = el.getBoundingClientRect().height;
     if (h0 > 0) setStickyH(h0);
 
@@ -325,44 +322,36 @@ export default function BubbleBoard() {
   }, []);
 
   const computeFeatured = useCallback(() => {
-    const sc = listRef.current;
-    if (!sc) return;
+    if (flatList.length === 0) return;
 
-    // a “linha” logo abaixo do sticky dentro do scroll container
-    const targetY = sc.scrollTop + stickyH + 16;
-
-    // escolhe o card cujo topo está mais próximo (>= targetY - tolerância)
+    const stickyTop = 78; // top do sticky (mesmo valor do className top-[78px])
+    const targetY = stickyTop + stickyH + 12; // linha logo abaixo do sticky, em coordenadas do viewport
     const TOL = 10;
 
     let bestId: string | null = null;
     let bestDelta = Number.POSITIVE_INFINITY;
 
+    // escolhe o primeiro card cujo topo está mais próximo da linha target (logo abaixo do sticky)
     for (const item of flatList) {
       const el = cardElsRef.current[item.id];
       if (!el) continue;
 
-      const top = el.offsetTop; // relativo ao scroll container
-      const delta = top - targetY;
+      const r = el.getBoundingClientRect();
+      const delta = r.top - targetY;
 
-      // queremos o primeiro que “assume” abaixo do sticky:
-      // delta >= -TOL (permite pequena sobreposição)
       if (delta >= -TOL && delta < bestDelta) {
         bestDelta = delta;
         bestId = item.id;
       }
     }
 
-    // se chegamos no final e não há ninguém “abaixo” da linha, o featured vira o último
-    if (!bestId && flatList.length > 0) {
-      bestId = flatList[flatList.length - 1].id;
-    }
+    // se nenhum atende (fim da página), força o último
+    if (!bestId) bestId = flatList[flatList.length - 1].id;
 
-    if (bestId) {
-      setFeaturedId((prev) => (prev === bestId ? prev : bestId));
-    }
+    setFeaturedId((prev) => (prev === bestId ? prev : bestId));
   }, [flatList, stickyH]);
 
-  const onScroll = useCallback(() => {
+  const onWindowScroll = useCallback(() => {
     if (rafRef.current) return;
     rafRef.current = window.requestAnimationFrame(() => {
       rafRef.current = null;
@@ -372,34 +361,32 @@ export default function BubbleBoard() {
 
   useEffect(() => {
     computeFeatured();
-    const onResize = () => computeFeatured();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [computeFeatured]);
+    window.addEventListener("scroll", onWindowScroll, { passive: true });
+    window.addEventListener("resize", computeFeatured);
+    return () => {
+      window.removeEventListener("scroll", onWindowScroll);
+      window.removeEventListener("resize", computeFeatured);
+    };
+  }, [computeFeatured, onWindowScroll]);
 
   const featured = featuredId ? byId.get(featuredId) ?? null : null;
 
-  // ===== UI helpers =====
-  const cardChrome = (b: Bubble) => {
-    const accent = stateAccent(b.state);
-    return [
-      "w-full text-left rounded-2xl border shadow-sm",
-      "flex flex-col gap-4",
-      "transition",
-      accent.bg,
-      accent.border,
-    ].join(" ");
-  };
-
+  // ===== UI =====
   const renderFeaturedCard = (b: Bubble & { category: string }) => {
     const likedState = liked[b.id];
+    const accent = stateAccent(b.state);
 
     return (
       <div
         className={[
-          cardChrome(b),
-          "shadow-md ring-2 ring-orange-200",
+          "w-full text-left rounded-2xl border shadow-sm",
+          "flex flex-col gap-4",
           "py-7 px-5",
+          "shadow-md ring-2",
+          accent.bg,
+          accent.border,
+          accent.ring, // <- ring agora muda conforme status
+          "transition",
         ].join(" ")}
         onClick={() => setSelected(asDetail(b))}
       >
@@ -464,6 +451,7 @@ export default function BubbleBoard() {
 
   const renderListCard = (b: Bubble & { category: string; group: string }, idx: number) => {
     const likedState = liked[b.id];
+    const accent = stateAccent(b.state);
 
     return (
       <div
@@ -472,9 +460,13 @@ export default function BubbleBoard() {
           cardElsRef.current[b.id] = el;
         }}
         className={[
-          cardChrome(b),
-          idx === 0 ? "py-5 px-4" : "py-3 px-3",
+          "w-full text-left rounded-2xl border shadow-sm",
+          "flex flex-col gap-4",
           "hover:shadow-md active:translate-y-[1px]",
+          "transition",
+          accent.bg,
+          accent.border,
+          idx === 0 ? "py-5 px-4" : "py-3 px-3",
         ].join(" ")}
         onClick={() => setSelected(asDetail(b))}
       >
@@ -527,8 +519,17 @@ export default function BubbleBoard() {
     );
   };
 
-  // (valor usado só para “folga” adicional)
+  // Spacer: empurra a lista para baixo do sticky featured (dinâmico e correto)
   const spacerH = Math.max(200, stickyH + 16);
+
+  // Modal via Portal: garante overlay no topo, independente do layout/scroll
+  const modalNode =
+    typeof document !== "undefined"
+      ? ReactDOM.createPortal(
+          <TopicModal open={!!selected} topic={selected} onClose={() => setSelected(null)} />,
+          document.body
+        )
+      : null;
 
   return (
     <>
@@ -543,33 +544,23 @@ export default function BubbleBoard() {
           />
         </div>
 
-        <div className="mx-auto w-full max-w-3xl px-4 pt-4">
+        <div className="mx-auto w-full max-w-3xl px-4 pt-4 pb-12">
           {/* Featured sticky (card principal fixo) */}
           <div ref={stickyRef} className="sticky top-[78px] z-20">
             {featured ? renderFeaturedCard(featured) : null}
           </div>
 
-          {/* Lista com scroll */}
-          <div
-            ref={listRef}
-            onScroll={onScroll}
-            className="flex flex-col gap-4 pb-12 overflow-y-auto"
-            style={{ height: "calc(100vh - 78px)" }}
-          >
-            {/* Spacer dinâmico para a lista não ficar escondida sob o sticky */}
-            <div style={{ height: spacerH }} />
+          {/* Spacer para a lista não ficar por baixo do featured */}
+          <div style={{ height: spacerH }} />
 
+          {/* Lista (sem scroll interno; scroll é da página) */}
+          <div className="flex flex-col gap-4">
             {flatList.map((b, idx) => renderListCard(b, idx))}
           </div>
         </div>
       </div>
 
-      {/* Wrapper FIXO para garantir que o modal apareça no topo da tela */}
-      <div className="fixed inset-0 z-[999] pointer-events-none">
-        <div className="pointer-events-auto">
-          <TopicModal open={!!selected} topic={selected} onClose={() => setSelected(null)} />
-        </div>
-      </div>
+      {modalNode}
     </>
   );
 }
