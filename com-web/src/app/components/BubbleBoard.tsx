@@ -58,7 +58,6 @@ function asDetail(b: Bubble): TopicDetail {
 }
 
 function makeSeries(mode: "up" | "down") {
-  // Série fake (0..15min). Trocar por dados reais depois.
   const pts: { t: number; v: number }[] = [];
   let v = mode === "up" ? 0.35 : 0.7;
 
@@ -73,7 +72,7 @@ function makeSeries(mode: "up" | "down") {
 export default function BubbleBoard() {
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
 
-  // Tabs/pager (scroll horizontal entre categorias)
+  // Tabs/pager
   const [activeIndex, setActiveIndex] = useState(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
@@ -93,23 +92,42 @@ export default function BubbleBoard() {
     setActiveIndex(idx);
   }, []);
 
-  // Modal de detalhes (restaurado)
+  // Modal
   const [selected, setSelected] = useState<TopicDetail | null>(null);
 
-  // Destaques (para partículas saírem do centro da bolha)
+  // Refs para partículas
   const hotRef = useRef<HTMLButtonElement | null>(null);
   const coolRef = useRef<HTMLButtonElement | null>(null);
 
   const activeCat = data[activeIndex];
 
-  // Troca do par hot/cool (mais lento)
-  const CHANGE_MS = 3800;
+  // Troca do par: 10s
+  const CHANGE_MS = 10_000;
   const [pairTick, setPairTick] = useState(0);
 
   useEffect(() => {
     const t = window.setInterval(() => setPairTick((x) => x + 1), CHANGE_MS);
     return () => window.clearInterval(t);
   }, []);
+
+  // phase (0..1) ao longo dos 10s, para scale suave
+  const [phase, setPhase] = useState(0);
+  const cycleStartRef = useRef<number>(performance.now());
+
+  useEffect(() => {
+    cycleStartRef.current = performance.now();
+    let raf = 0;
+
+    const loop = () => {
+      const now = performance.now();
+      const p = Math.min(1, Math.max(0, (now - cycleStartRef.current) / CHANGE_MS));
+      setPhase(p);
+      raf = requestAnimationFrame(loop);
+    };
+
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [pairTick]);
 
   const { hotBubble, coolBubble } = useMemo(() => {
     const items = activeCat?.items ?? [];
@@ -121,11 +139,11 @@ export default function BubbleBoard() {
     };
   }, [activeCat, pairTick]);
 
-  // Atualiza estados/energy: hot sobe, cool desce, resto volta pro baseline
+  // Atualiza energy devagar ao longo do ciclo
   useEffect(() => {
     if (!activeCat || !hotBubble || !coolBubble) return;
 
-    const STEP_MS = 120;
+    const STEP_MS = 160;
     const t = window.setInterval(() => {
       setData((prev) =>
         prev.map((cat, idx) => {
@@ -134,15 +152,11 @@ export default function BubbleBoard() {
           return {
             ...cat,
             items: cat.items.map((b) => {
-              if (b.id === hotBubble.id) {
-                return { ...b, state: "hot", energy: clamp01(b.energy + 0.014), size: "md" };
-              }
-              if (b.id === coolBubble.id) {
-                return { ...b, state: "cool", energy: clamp01(b.energy - 0.011), size: "sm" };
-              }
+              if (b.id === hotBubble.id) return { ...b, state: "hot", energy: clamp01(b.energy + 0.010), size: "md" };
+              if (b.id === coolBubble.id) return { ...b, state: "cool", energy: clamp01(b.energy - 0.008), size: "sm" };
 
               const baseline = 0.5;
-              return { ...b, state: "steady", energy: clamp01(b.energy + (baseline - b.energy) * 0.03) };
+              return { ...b, state: "steady", energy: clamp01(b.energy + (baseline - b.energy) * 0.02) };
             }),
           };
         })
@@ -152,18 +166,22 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, [activeIndex, activeCat, hotBubble?.id, coolBubble?.id]);
 
-  // Séries do gráfico (independentes)
+  // scales progressivos
+  const hotScale = 1.0 + 0.18 * phase; // cresce ao longo dos 10s
+  const coolScale = 1.0 - 0.12 * phase; // diminui ao longo dos 10s
+
+  // Séries dos gráficos
   const hotSeries = useMemo(() => makeSeries("up"), [pairTick, activeIndex]);
   const coolSeries = useMemo(() => makeSeries("down"), [pairTick, activeIndex]);
 
-  // Partículas (origem = bolha em destaque)
   const getHotRect = useCallback(() => hotRef.current?.getBoundingClientRect() ?? null, []);
   const getCoolRect = useCallback(() => coolRef.current?.getBoundingClientRect() ?? null, []);
 
   return (
     <>
-      <BubbleParticles active={!!hotBubble} direction="up" colorVar="var(--hot-br)" getSourceRect={getHotRect} />
-      <BubbleParticles active={!!coolBubble} direction="down" colorVar="var(--cool-br)" getSourceRect={getCoolRect} />
+      {/* Partículas: quente entra / fria sai */}
+      <BubbleParticles active={!!hotBubble} mode="in" colorVar="var(--hot-br)" getSourceRect={getHotRect} intensity={16} />
+      <BubbleParticles active={!!coolBubble} mode="out" colorVar="var(--cool-br)" getSourceRect={getCoolRect} intensity={14} />
 
       {/* Tabs */}
       <div className="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-gray-100">
@@ -194,7 +212,7 @@ export default function BubbleBoard() {
         </div>
       </div>
 
-      {/* Pager horizontal */}
+      {/* Pager */}
       <div
         ref={viewportRef}
         onScroll={onScroll}
@@ -217,7 +235,6 @@ export default function BubbleBoard() {
             const items = cat.items;
             const isActive = cat.title === activeCat?.title;
 
-            // fallback simples quando não é a categoria ativa
             const hot = isActive ? hotBubble : items[0];
             const cool = isActive ? coolBubble : items[1];
 
@@ -227,19 +244,17 @@ export default function BubbleBoard() {
                 className="w-full flex-none snap-center px-5 pb-8"
                 style={{ minHeight: "calc(100dvh - 72px)" }}
               >
-                <div className="pt-6 flex flex-col gap-4">
-                  {/* Bolhas grandes (somente 2) */}
-                  <div className="flex justify-center gap-5">
+                <div className="pt-7 flex flex-col gap-5">
+                  {/* Bolhas grandes: mais espaço entre elas */}
+                  <div className="flex justify-center gap-10">
                     <button
                       ref={isActive ? hotRef : undefined}
                       type="button"
                       onClick={() => hot && setSelected(asDetail(hot))}
-                      className="bubble bubble-hot rounded-full border overflow-hidden flex flex-col items-center justify-center w-24 h-24"
-                      style={{ ["--e" as any]: hot?.energy ?? 0.6 }}
+                      className="bubble bubble-hot rounded-full border overflow-hidden flex flex-col items-center justify-center w-24 h-24 transition-transform duration-300 will-change-transform"
+                      style={{ ["--e" as any]: hot?.energy ?? 0.6, transform: `scale(${hotScale})` }}
                     >
-                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">
-                        {hot?.label ?? "—"}
-                      </div>
+                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">{hot?.label ?? "—"}</div>
                       <div className="text-[10px] text-gray-600 mt-1">Aquecendo</div>
                     </button>
 
@@ -247,18 +262,15 @@ export default function BubbleBoard() {
                       ref={isActive ? coolRef : undefined}
                       type="button"
                       onClick={() => cool && setSelected(asDetail(cool))}
-                      className="bubble bubble-cool rounded-full border overflow-hidden flex flex-col items-center justify-center w-24 h-24"
-                      style={{ ["--e" as any]: cool?.energy ?? 0.4 }}
+                      className="bubble bubble-cool rounded-full border overflow-hidden flex flex-col items-center justify-center w-24 h-24 transition-transform duration-300 will-change-transform"
+                      style={{ ["--e" as any]: cool?.energy ?? 0.4, transform: `scale(${coolScale})` }}
                     >
-                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">
-                        {cool?.label ?? "—"}
-                      </div>
+                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">{cool?.label ?? "—"}</div>
                       <div className="text-[10px] text-gray-600 mt-1">Esfriando</div>
                     </button>
                   </div>
 
-                  {/* Gráficos independentes (empilhados e próximos)
-                      - o primeiro sem eixo X para parecer um bloco só */}
+                  {/* Gráficos independentes (empilhados e próximos) */}
                   <div className="flex flex-col gap-1">
                     <TrendChartSingle
                       now={new Date()}
@@ -280,7 +292,7 @@ export default function BubbleBoard() {
                     />
                   </div>
 
-                  {/* Grid de bolhas (todas) */}
+                  {/* Grid de bolhas */}
                   <div className="pt-1">
                     <div className="flex flex-wrap gap-3 justify-center">
                       {items.map((b) => (
