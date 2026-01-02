@@ -88,63 +88,51 @@ function TopicCard({ bubble, onClick, size = "sm", emphasize }: TopicCardProps) 
   const isCool = state === "cool";
 
   const sizing = size === "lg" ? "w-28 h-28 p-3" : "w-24 h-24 p-2.5";
-  const palette =
+  const fillColor =
     state === "hot"
-      ? "bg-orange-50 border-orange-200"
+      ? "rgb(255 237 213)" // orange-50
       : state === "cool"
-      ? "bg-sky-50 border-sky-200"
-      : "bg-white border-slate-200";
+      ? "rgb(224 242 254)" // sky-50
+      : "white";
+  const strokeColor =
+    state === "hot"
+      ? "rgb(254 215 170)" // orange-200
+      : state === "cool"
+      ? "rgb(186 230 253)" // sky-200
+      : "rgb(226 232 240)"; // slate-200
 
   return (
     <button
       type="button"
       onClick={onClick}
       className={[
-        "relative overflow-visible",
+        "relative overflow-hidden",
         "flex flex-col justify-between",
-        "rounded-[8px] border shadow-sm",
         "transition hover:-translate-y-[1px] hover:shadow-md active:translate-y-0",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400",
         sizing,
-        palette,
       ].join(" ")}
+      style={{
+        filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.06))",
+      }}
     >
-      {/* cauda estilo message-square (canto inferior esquerdo) */}
-      <span
+      {/* fundo em formato message-square via SVG que você mandou */}
+      <svg
         aria-hidden="true"
-        className={[
-          "pointer-events-none absolute -bottom-[7px] left-3",
-          "w-3.5 h-3.5 rotate-45",
-          palette.replace("border", "tail").split(" ")[0], // noop, só para manter array
-        ].join(" ")}
-        style={{
-          background: undefined,
-          borderLeft: undefined,
-          borderTop: undefined,
-        }}
-      />
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute -bottom-[7px] left-3 w-3.5 h-3.5 rotate-45"
-        style={{
-          backgroundColor:
-            state === "hot" ? "rgb(255 237 213)" : state === "cool" ? "rgb(224 242 254)" : "white",
-          borderLeft:
-            state === "hot"
-              ? "1px solid rgb(254 215 170)"
-              : state === "cool"
-              ? "1px solid rgb(186 230 253)"
-              : "1px solid rgb(226 232 240)",
-          borderTop:
-            state === "hot"
-              ? "1px solid rgb(254 215 170)"
-              : state === "cool"
-              ? "1px solid rgb(186 230 253)"
-              : "1px solid rgb(226 232 240)",
-        }}
-      />
+        className="absolute inset-0 w-full h-full"
+        viewBox="0 0 24 24"
+        preserveAspectRatio="none"
+      >
+        <path
+          d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"
+          fill={fillColor}
+          stroke={strokeColor}
+          strokeWidth={1.4}
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
 
-      <div className="flex items-center justify-between gap-1">
+      <div className="relative z-10 flex items-center justify-between gap-1">
         <span
           className={[
             "rounded-full px-2 py-[3px] text-[10px] font-semibold tracking-wide",
@@ -156,7 +144,7 @@ function TopicCard({ bubble, onClick, size = "sm", emphasize }: TopicCardProps) 
         <MessageSquareIcon hot={isHot} />
       </div>
 
-      <div className="flex flex-col items-start gap-1">
+      <div className="relative z-10 flex flex-col items-start gap-1">
         <span className="text-[12px] font-semibold leading-tight text-slate-900">{bubble.label}</span>
         <span
           className={[
