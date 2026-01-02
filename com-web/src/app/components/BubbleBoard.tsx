@@ -525,7 +525,7 @@ export default function BubbleBoard() {
           {/* Lista sem scroll interno, usa scroll da janela */}
           <div className="flex flex-col gap-4 pb-24">
             {/* pequeno espaçador superior */}
-            <div style={{ height: 16 }} />
+            <div style={{ height: 0 }} />
             {flatList.map((b, idx) => renderListCard(b, idx))}
             {/* espaçador inferior para permitir cruzar o alvo */}
             <div style={{ height: 320 }} />
