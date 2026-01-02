@@ -145,7 +145,7 @@ export default function TrendChartsStack({
   width = 360,
   hotHeight = 130,
   coolHeight = 145,
-  overlapPx = 50,
+  overlapPx = 30,
 }: {
   hot: { name: string; points: Point[] };
   cool: { name: string; points: Point[] };
