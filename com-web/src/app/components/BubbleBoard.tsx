@@ -133,9 +133,23 @@ function makeSeededRand(seed: number) {
    - energy com inércia
 ====================================================== */
 
-function toStateFromGrowth(g: number): Bubble["state"] {
-  if (g >= 0.08) return "hot";
-  if (g <= -0.06) return "cool";
+function toStateFromGrowth(g: number, prev?: Bubble["state"]): Bubble["state"] {
+  // thresholds de entrada (mais difíceis) e saída (mais fáceis)
+  const HOT_IN = 0.12;
+  const HOT_OUT = 0.06;
+
+  const COOL_IN = -0.10;
+  const COOL_OUT = -0.05;
+
+  // mantém hot até cair abaixo do HOT_OUT
+  if (prev === "hot") return g >= HOT_OUT ? "hot" : "steady";
+
+  // mantém cool até subir acima do COOL_OUT
+  if (prev === "cool") return g <= COOL_OUT ? "cool" : "steady";
+
+  // entrada em hot/cool é mais exigente
+  if (g >= HOT_IN) return "hot";
+  if (g <= COOL_IN) return "cool";
   return "steady";
 }
 
@@ -298,7 +312,7 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
           ...cat,
           items: cat.items.map((b) => {
             const g = simulateGrowthDet(b.id, tick);
-            const state = toStateFromGrowth(g);
+            const state = toStateFromGrowth(g, b.state);
 
             return {
               ...b,
