@@ -138,7 +138,7 @@ export default function TrendChartsStack({
   width = 360,
   hotHeight = 130,
   coolHeight = 145,
-  overlapPx = 14, // <- aproxima (sobrepõe) o de baixo
+  overlapPx = 8, // <- aproxima (sobrepõe) o de baixo
 }: {
   hot: { name: string; points: Point[] };
   cool: { name: string; points: Point[] };
