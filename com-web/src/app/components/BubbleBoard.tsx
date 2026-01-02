@@ -69,26 +69,18 @@ function formatDeltaPct(v?: number) {
   return `${pct}%`;
 }
 
-function TrendPill({ state, spark }: { state: Bubble["state"]; spark?: number }) {
+function TrendInline({ spark }: { spark?: number }) {
   const pct = formatDeltaPct(spark);
-  const abs = Math.abs((spark ?? 0) * 100);
   const icon =
     spark && spark > 0.5 ? "↑" : spark && spark < -0.5 ? "↓" : spark && spark > 0 ? "↗" : spark && spark < 0 ? "↘" : "→";
 
-  const label = abs < 1 ? "quase estável" : spark && spark > 0 ? "subindo" : spark && spark < 0 ? "caindo" : "estável";
-
-  const cls =
-    state === "hot"
-      ? "bg-orange-100 border-orange-200 text-orange-900"
-      : state === "cool"
-      ? "bg-sky-100 border-sky-200 text-sky-900"
-      : "bg-slate-100 border-slate-200 text-slate-800";
-
   return (
-    <div className={["inline-flex items-center gap-2 rounded-full border px-3 py-2", cls].join(" ")}>
-      <span className="text-sm font-semibold leading-none">{icon}</span>
-      <span className="text-sm font-semibold leading-none">{pct}</span>
-      <span className="text-xs font-medium text-slate-700/80">últimos 15 min · {label}</span>
+    <div className="shrink-0 text-right leading-tight">
+      <div className="text-sm font-semibold text-slate-900">
+        <span className="mr-1">{icon}</span>
+        {pct}
+      </div>
+      <div className="text-[11px] text-slate-500">últimos 15 min</div>
     </div>
   );
 }
@@ -107,75 +99,113 @@ function makeSeededRand(seed: number) {
   };
 }
 
-function WaveBars({ id, state, energy }: { id: string; state: Bubble["state"]; energy: number }) {
+function WaveBars({
+  id,
+  state,
+  energy,
+}: {
+  id: string;
+  state: Bubble["state"];
+  energy: number;
+}) {
   const v = clamp01(energy);
 
-  const base = 0.25 + v * 0.65; // 0.25..0.90
-  const amp = state === "hot" ? 0.55 : state === "cool" ? 0.22 : 0.12;
-  const dur = state === "hot" ? 900 : state === "cool" ? 1200 : 1600;
-
+  // cor por estado
   const barCls = state === "hot" ? "bg-orange-400" : state === "cool" ? "bg-sky-400" : "bg-slate-400";
 
-  const seed = hash32(id);
-  const rand = makeSeededRand(seed);
+  // animação mais suave (quase "respiração")
+  const dur = state === "hot" ? 1400 : state === "cool" ? 1700 : 2200;
 
-  const bars = Array.from({ length: 17 }, (_, i) => {
-    const shape = 0.65 + rand() * 0.7; // 0.65..1.35
-    const h0 = Math.round(clamp01(base * shape) * 100);
-    const delay = Math.round((i * 55 + rand() * 40) * 10) / 10;
-    const phase = (i % 2 === 0 ? 1 : -1) * (0.6 + rand() * 0.6);
+  // amplitude pequena: evita oscilação "equalizer"
+  const amp = state === "hot" ? 0.16 : state === "cool" ? 0.10 : 0.06;
+
+  // base geral por energia (só para não ficar tudo minúsculo)
+  const baseLevel = 0.18 + v * 0.70; // 0.18..0.88
+
+  // barras mais densas e preenchendo largura
+  const COUNT = 26;
+
+  const rand = makeSeededRand(hash32(id));
+
+  const bars = Array.from({ length: COUNT }, (_, i) => {
+    const t = COUNT <= 1 ? 0 : i / (COUNT - 1); // 0..1
+
+    // rampa por estado:
+    // hot: começa pequeno e cresce
+    // cool: começa grande e diminui
+    // steady: quase constante
+    const ramp =
+      state === "hot" ? 0.30 + t * 0.90 : state === "cool" ? 1.20 - t * 0.90 : 0.75 + (rand() * 0.08 - 0.04);
+
+    // leve jitter só para não ficar "perfeito" demais (muito pequeno)
+    const jitter = rand() * 0.06 - 0.03;
+
+    // altura alvo (0..100)
+    const h0 = Math.round(clamp01(baseLevel * ramp + jitter) * 100);
+
+    // delays muito pequenos para dar sensação de movimento sem virar onda forte
+    const delay = Math.round((i * 28) * 10) / 10; // ms
+
+    // fase alternada minimalista
+    const phase = (i % 2 === 0 ? 1 : -1) * (0.25 + rand() * 0.25);
+
     return { i, h0, delay, phase };
   });
 
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-xs text-slate-600">
-          Nível de evidência:{" "}
-          <span className="font-semibold text-slate-900">{v >= 0.72 ? "Alto" : v >= 0.45 ? "Médio" : "Baixo"}</span>
+    <div className="w-full h-full">
+      <div className="relative w-full h-full rounded-2xl border border-slate-200 bg-white/70 overflow-hidden px-4 py-4">
+        {/* barras centralizadas verticalmente, preenchendo o card */}
+        <div className="absolute inset-0 px-4 py-4 flex items-end gap-[6px]">
+          {bars.map((b) => (
+            <div
+              key={b.i}
+              className={["flex-1 rounded-full opacity-90", barCls, "wavebar"].join(" ")}
+              style={
+                {
+                  height: `${b.h0}%`,
+                  animationDuration: `${dur}ms`,
+                  animationDelay: `${b.delay}ms`,
+                  ["--amp" as any]: amp,
+                  ["--phase" as any]: b.phase,
+                } as React.CSSProperties
+              }
+            />
+          ))}
         </div>
 
-        <div className="text-xs text-slate-500">{state === "hot" ? "em alta" : state === "cool" ? "perdendo força" : "estável"}</div>
-      </div>
-
-      <div className="h-12 w-full rounded-2xl border border-slate-200 bg-white/70 px-3 flex items-end gap-[6px] overflow-hidden">
-        {bars.map((b) => (
-          <div
-            key={b.i}
-            className={["w-[7px] rounded-full opacity-90", barCls, "wavebar"].join(" ")}
-            style={
-              {
-                height: `${b.h0}%`,
-                animationDuration: `${dur}ms`,
-                animationDelay: `${b.delay}ms`,
-                ["--amp" as any]: amp,
-                ["--phase" as any]: b.phase,
-              } as React.CSSProperties
-            }
-          />
-        ))}
+        {/* legenda discreta no canto */}
+        <div className="relative z-10 flex items-center justify-between text-[11px] text-slate-600">
+          <span>
+            Evidência:{" "}
+            <span className="font-semibold text-slate-900">
+              {v >= 0.72 ? "Alta" : v >= 0.45 ? "Média" : "Baixa"}
+            </span>
+          </span>
+          <span className="text-slate-500">{state === "hot" ? "ganhando força" : state === "cool" ? "perdendo força" : "estável"}</span>
+        </div>
       </div>
 
       <style jsx>{`
         .wavebar {
           transform-origin: bottom;
-          animation-name: wavePulse;
+          animation-name: breathPulse;
           animation-timing-function: ease-in-out;
           animation-iteration-count: infinite;
         }
 
-        @keyframes wavePulse {
+        @keyframes breathPulse {
           0% {
-            transform: scaleY(calc(1 - var(--amp) * 0.35));
-            opacity: 0.78;
+            transform: scaleY(calc(1 - var(--amp) * 0.55));
+            opacity: 0.82;
           }
           50% {
-            transform: scaleY(calc(1 + var(--amp) * (0.65 + var(--phase) * 0.08)));
-            opacity: 0.95;
+            transform: scaleY(calc(1 + var(--amp) * (0.9 + var(--phase) * 0.2)));
+            opacity: 0.96;
           }
           100% {
-            transform: scaleY(calc(1 - var(--amp) * 0.28));
-            opacity: 0.8;
+            transform: scaleY(calc(1 - var(--amp) * 0.45));
+            opacity: 0.84;
           }
         }
       `}</style>
@@ -192,6 +222,7 @@ export default function BubbleBoard() {
   const CHANGE_MS = 10_000;
   const [tick, setTick] = useState(0);
 
+  // ordem estável por categoria (evita reinício do STEP)
   const orderRef = useRef(
     INITIAL_DATA.map((cat) => ({
       title: cat.title,
@@ -243,12 +274,17 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, [hotCoolByCategory]);
 
-  const itemsWithCategory = useMemo(() => data.flatMap((cat) => cat.items.map((b) => ({ ...b, category: cat.title }))), [data]);
+  const itemsWithCategory = useMemo(
+    () => data.flatMap((cat) => cat.items.map((b) => ({ ...b, category: cat.title }))),
+    [data]
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return itemsWithCategory;
-    return itemsWithCategory.filter((b) => b.label.toLowerCase().includes(q) || b.category.toLowerCase().includes(q));
+    return itemsWithCategory.filter(
+      (b) => b.label.toLowerCase().includes(q) || b.category.toLowerCase().includes(q)
+    );
   }, [itemsWithCategory, search]);
 
   const grouped = useMemo(() => {
@@ -276,17 +312,18 @@ export default function BubbleBoard() {
     return ids;
   }, [grouped]);
 
-  const [activeGraphId, setActiveGraphId] = useState<string | null>(null);
+  // featured = primeiro visível no scroll
+  const [activeFeaturedId, setActiveFeaturedId] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const cardElsRef = useRef<Record<string, HTMLDivElement | null>>({});
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setActiveGraphId(renderOrderIds[0] ?? null);
+    setActiveFeaturedId(renderOrderIds[0] ?? null);
   }, [renderOrderIds]);
 
-  const computeActiveGraph = useCallback(() => {
+  const computeFeatured = useCallback(() => {
     const sc = scrollRef.current;
     if (!sc) return;
 
@@ -299,7 +336,7 @@ export default function BubbleBoard() {
 
       const y = el.offsetTop;
       if (y + el.offsetHeight >= top + threshold) {
-        setActiveGraphId((prev) => (prev === id ? prev : id));
+        setActiveFeaturedId((prev) => (prev === id ? prev : id));
         return;
       }
     }
@@ -309,13 +346,13 @@ export default function BubbleBoard() {
     if (rafRef.current) return;
     rafRef.current = window.requestAnimationFrame(() => {
       rafRef.current = null;
-      computeActiveGraph();
+      computeFeatured();
     });
-  }, [computeActiveGraph]);
+  }, [computeFeatured]);
 
   useEffect(() => {
-    computeActiveGraph();
-  }, [computeActiveGraph]);
+    computeFeatured();
+  }, [computeFeatured]);
 
   const cardSizes = (featured: boolean, idxInGroup: number) => {
     if (featured) return "py-7 px-5";
@@ -327,7 +364,7 @@ export default function BubbleBoard() {
   const renderCard = (b: Bubble & { category: string }, idx: number, group: "hot" | "cool" | "steady") => {
     const accent = stateAccent(b.state);
     const likedState = liked[b.id];
-    const isFeatured = activeGraphId === b.id;
+    const isFeatured = activeFeaturedId === b.id;
 
     return (
       <div
@@ -388,17 +425,22 @@ export default function BubbleBoard() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-1">
-          <p className={isFeatured ? "text-2xl md:text-3xl font-semibold text-slate-900 leading-tight" : "text-base font-semibold text-slate-900 leading-tight"}>
-            {b.label}
-          </p>
-          <p className={isFeatured ? "text-sm text-slate-600" : "text-sm text-slate-500"}>Toque para ver detalhes</p>
+        {/* Assunto + tendência na MESMA LINHA (featured) */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <p className={isFeatured ? "text-2xl md:text-3xl font-semibold text-slate-900 leading-tight" : "text-base font-semibold text-slate-900 leading-tight"}>
+              {b.label}
+            </p>
+            <p className={isFeatured ? "text-sm text-slate-600" : "text-sm text-slate-500"}>Toque para ver detalhes</p>
+          </div>
+
+          {isFeatured && <TrendInline spark={b.spark ?? (b.state === "cool" ? -0.06 : 0.06)} />}
         </div>
 
+        {/* Barras preenchendo e com mais altura (featured) */}
         {isFeatured && (
-          <div className="w-full rounded-2xl border border-slate-200 bg-white/70 p-4">
-            <div className="flex flex-col gap-3">
-              <TrendPill state={b.state} spark={b.spark ?? (b.state === "cool" ? -0.06 : 0.06)} />
+          <div className="w-full">
+            <div className="h-28 md:h-32">
               <WaveBars id={b.id} state={b.state} energy={b.energy} />
             </div>
           </div>
