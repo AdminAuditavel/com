@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TopicModal, { type TopicDetail } from "@/app/components/TopicModal";
-import TrendChartsStack from "@/app/components/TrendChartsStack";
 import BubbleParticles from "@/app/components/BubbleParticles";
 
 type Bubble = {
@@ -69,8 +68,7 @@ function makeSeries(mode: "up" | "down") {
   return pts;
 }
 
-function MessageIcon({ hot }: { hot?: boolean }) {
-  // ícone simples de balão de fala
+function MessageSquareIcon({ hot }: { hot?: boolean }) {
   return (
     <svg
       aria-hidden="true"
@@ -84,7 +82,7 @@ function MessageIcon({ hot }: { hot?: boolean }) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M7 17v3l3-3h7a4 4 0 0 0 4-4V7a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v6a4 4 0 0 0 4 4z" />
+      <path d="M5 4h14a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2h-5.5L8.5 21v-4.5H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
     </svg>
   );
 }
@@ -122,7 +120,7 @@ function TopicCard({ bubble, onClick, size = "sm", emphasize }: TopicCardProps) 
         >
           {bubble.category}
         </span>
-        <MessageIcon hot={isHot} />
+        <MessageSquareIcon hot={isHot} />
       </div>
 
       <div className="flex flex-col items-start gap-1">
@@ -143,31 +141,10 @@ function TopicCard({ bubble, onClick, size = "sm", emphasize }: TopicCardProps) 
 export default function BubbleBoard() {
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
 
-  const [activeIndex, setActiveIndex] = useState(0);
-  const viewportRef = useRef<HTMLDivElement | null>(null);
-
-  const goTo = useCallback((idx: number) => {
-    const el = viewportRef.current;
-    if (!el) return;
-    const w = el.clientWidth || 1;
-    el.scrollTo({ left: idx * w, behavior: "smooth" });
-    setActiveIndex(idx);
-  }, []);
-
-  const onScroll = useCallback(() => {
-    const el = viewportRef.current;
-    if (!el) return;
-    const w = el.clientWidth || 1;
-    const idx = Math.round(el.scrollLeft / w);
-    setActiveIndex(idx);
-  }, []);
-
   const [selected, setSelected] = useState<TopicDetail | null>(null);
 
   const hotRef = useRef<HTMLDivElement | null>(null);
   const coolRef = useRef<HTMLDivElement | null>(null);
-
-  const activeCat = data[activeIndex];
 
   const CHANGE_MS = 10_000;
   const [pairTick, setPairTick] = useState(0);
@@ -195,61 +172,53 @@ export default function BubbleBoard() {
     return () => cancelAnimationFrame(raf);
   }, [pairTick]);
 
+  const itemsWithCategory = useMemo(
+    () => data.flatMap((cat) => cat.items.map((b) => ({ ...b, category: cat.title }))),
+    [data]
+  );
+
   const { hotBubble, coolBubble } = useMemo(() => {
-    const items = activeCat?.items ?? [];
+    const items = itemsWithCategory;
     if (items.length < 2) return { hotBubble: items[0], coolBubble: items[1] };
 
-    // mantém rotação, mas exibiremos ordenado abaixo
     return {
       hotBubble: items[pairTick % items.length],
       coolBubble: items[(pairTick + 1) % items.length],
     };
-  }, [activeCat, pairTick]);
+  }, [itemsWithCategory, pairTick]);
 
   useEffect(() => {
-    if (!activeCat || !hotBubble || !coolBubble) return;
+    if (!hotBubble || !coolBubble) return;
 
     const STEP_MS = 160;
     const t = window.setInterval(() => {
       setData((prev) =>
-        prev.map((cat, idx) => {
-          if (idx !== activeIndex) return cat;
+        prev.map((cat) => ({
+          ...cat,
+          items: cat.items.map((b) => {
+            if (b.id === hotBubble.id) return { ...b, state: "hot", energy: clamp01(b.energy + 0.010), size: "md" };
+            if (b.id === coolBubble.id) return { ...b, state: "cool", energy: clamp01(b.energy - 0.008), size: "sm" };
 
-          return {
-            ...cat,
-            items: cat.items.map((b) => {
-              if (b.id === hotBubble.id) return { ...b, state: "hot", energy: clamp01(b.energy + 0.010), size: "md" };
-              if (b.id === coolBubble.id) return { ...b, state: "cool", energy: clamp01(b.energy - 0.008), size: "sm" };
-
-              const baseline = 0.5;
-              return { ...b, state: "steady", energy: clamp01(b.energy + (baseline - b.energy) * 0.02) };
-            }),
-          };
-        })
+            const baseline = 0.5;
+            return { ...b, state: "steady", energy: clamp01(b.energy + (baseline - b.energy) * 0.02) };
+          }),
+        }))
       );
     }, STEP_MS);
 
     return () => window.clearInterval(t);
-  }, [activeIndex, activeCat, hotBubble?.id, coolBubble?.id]);
+  }, [hotBubble?.id, coolBubble?.id]);
 
   // hot ganha glow, cool reduz glow — não usamos mais escala de bolha
-  const hotGlow = 0.25 + 0.35 * phase; // para gradiente animado
+  const hotGlow = 0.25 + 0.35 * phase;
   const coolGlow = 0.35 - 0.2 * phase;
 
-  const hotSeries = useMemo(() => makeSeries("up"), [pairTick, activeIndex]);
-  const coolSeries = useMemo(() => makeSeries("down"), [pairTick, activeIndex]);
+  const sortedItems = useMemo(() => {
+    return [...itemsWithCategory].sort((a, b) => b.energy - a.energy);
+  }, [itemsWithCategory]);
 
   const getHotRect = useCallback(() => hotRef.current?.getBoundingClientRect() ?? null, []);
   const getCoolRect = useCallback(() => coolRef.current?.getBoundingClientRect() ?? null, []);
-
-  // enriquece com categoria e ordena por energia para lista
-  const itemsWithCategory = (cat: CategoryBlock | undefined) =>
-    (cat?.items ?? []).map((b) => ({ ...b, category: cat?.title ?? "" }));
-
-  const sortedItems = useMemo(() => {
-    const items = itemsWithCategory(activeCat);
-    return [...items].sort((a, b) => b.energy - a.energy);
-  }, [activeCat]);
 
   return (
     <>
@@ -268,133 +237,58 @@ export default function BubbleBoard() {
         intensity={12}
       />
 
-      {/* Header/tabs em fundo claro */}
-      <div className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur-sm">
-        <div className="px-5 py-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-semibold tracking-[0.22em] text-slate-500">
-                PULSO DO DEBATE
-              </p>
-              <p className="text-sm text-slate-600">O que está bombando agora</p>
+      <div className="w-full bg-slate-50 min-h-screen">
+        <div className="px-5 pb-10 pt-6 flex flex-col gap-5">
+          <div className="flex justify-center gap-3">
+            <div
+              className="relative"
+              style={{
+                filter: `drop-shadow(0 10px 28px rgba(255,119,29,${hotGlow.toFixed(2)}))`,
+              }}
+            >
+              <div ref={hotRef}>
+                {hotBubble ? (
+                  <TopicCard
+                    bubble={hotBubble as Bubble & { category: string }}
+                    onClick={() => setSelected(asDetail(hotBubble as Bubble))}
+                    size="lg"
+                    emphasize="hot"
+                  />
+                ) : null}
+              </div>
             </div>
-            <div className="flex gap-2">
-              {data.map((cat, idx) => {
-                const active = idx === activeIndex;
-                return (
-                  <button
-                    key={cat.title}
-                    type="button"
-                    onClick={() => {
-                      goTo(idx);
-                      setPairTick(0);
-                    }}
-                    className={[
-                      "px-3 py-2 rounded-full text-[11px] font-semibold tracking-widest transition border shadow-sm",
-                      active
-                        ? "bg-slate-900 text-white border-slate-900"
-                        : "bg-white text-slate-700 border-slate-200",
-                    ].join(" ")}
-                    aria-current={active ? "page" : undefined}
-                  >
-                    {cat.title}
-                  </button>
-                );
-              })}
+
+            <div
+              className="relative"
+              style={{
+                filter: `drop-shadow(0 10px 24px rgba(56,189,248,${coolGlow.toFixed(2)}))`,
+              }}
+            >
+              <div ref={coolRef}>
+                {coolBubble ? (
+                  <TopicCard
+                    bubble={coolBubble as Bubble & { category: string }}
+                    onClick={() => setSelected(asDetail(coolBubble as Bubble))}
+                    size="lg"
+                    emphasize="cool"
+                  />
+                ) : null}
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div
-        ref={viewportRef}
-        onScroll={onScroll}
-        className="w-full overflow-x-auto snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none]"
-        style={{ WebkitOverflowScrolling: "touch" }}
-      >
-        <style jsx>{`
-          div::-webkit-scrollbar {
-            display: none;
-          }
-        `}</style>
-
-        <div className="flex w-full bg-slate-50">
-          {data.map((cat) => {
-            const items = itemsWithCategory(cat);
-            const isActive = cat.title === activeCat?.title;
-
-            const hot = isActive ? hotBubble : items[0];
-            const cool = isActive ? coolBubble : items[1];
-
-            return (
-              <section
-                key={cat.title}
-                className="w-full flex-none snap-center px-5 pb-8"
-                style={{ minHeight: "calc(100dvh - 72px)" }}
-              >
-                <div className="pt-6 flex flex-col gap-5">
-                  <div className="flex justify-center gap-3">
-                    <div
-                      className="relative"
-                      style={{
-                        filter: `drop-shadow(0 10px 28px rgba(255,119,29,${hotGlow.toFixed(2)}))`,
-                      }}
-                    >
-                      <div ref={isActive ? hotRef : undefined}>
-                        {hot ? (
-                          <TopicCard
-                            bubble={{ ...(hot as Bubble), category: cat.title }}
-                            onClick={() => setSelected(asDetail(hot as Bubble))}
-                            size="lg"
-                            emphasize="hot"
-                          />
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div
-                      className="relative"
-                      style={{
-                        filter: `drop-shadow(0 10px 24px rgba(56,189,248,${coolGlow.toFixed(2)}))`,
-                      }}
-                    >
-                      <div ref={isActive ? coolRef : undefined}>
-                        {cool ? (
-                          <TopicCard
-                            bubble={{ ...(cool as Bubble), category: cat.title }}
-                            onClick={() => setSelected(asDetail(cool as Bubble))}
-                            size="lg"
-                            emphasize="cool"
-                          />
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-
-                  <TrendChartsStack
-                    now={new Date()}
-                    hot={{ name: hot?.label ?? "Quente", points: hotSeries }}
-                    cool={{ name: cool?.label ?? "Frio", points: coolSeries }}
-                  />
-
-                  <div className="pt-2">
-                    <div className="flex flex-wrap gap-3 justify-center">
-                      {items
-                        .sort((a, b) => b.energy - a.energy)
-                        .map((b) => (
-                          <TopicCard
-                            key={b.id}
-                            bubble={b}
-                            onClick={() => setSelected(asDetail(b))}
-                            size="sm"
-                          />
-                        ))}
-                    </div>
-                  </div>
-                </div>
-              </section>
-            );
-          })}
+          <div className="pt-2">
+            <div className="flex flex-wrap gap-3 justify-center">
+              {sortedItems.map((b) => (
+                <TopicCard
+                  key={b.id}
+                  bubble={b}
+                  onClick={() => setSelected(asDetail(b))}
+                  size="sm"
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
