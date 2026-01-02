@@ -1,6 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import BubbleBoard from "@/app/components/BubbleBoard";
 
 export default function Home() {
+  const [search, setSearch] = useState("");
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       {/* iOS-like top bar (title + search) */}
@@ -18,8 +23,8 @@ export default function Home() {
               ⌕
             </span>
             <input
-              // BubbleBoard vai capturar via querystring (q) por enquanto
-              name="q"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar tema ou categoria..."
               className="w-full h-11 rounded-2xl border border-slate-200/70 bg-white/70 pl-9 pr-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
             />
@@ -27,7 +32,7 @@ export default function Home() {
         </div>
       </header>
 
-      <BubbleBoard />
+      <BubbleBoard search={search} headerOffsetPx={148} />
     </main>
   );
 }
