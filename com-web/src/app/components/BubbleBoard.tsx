@@ -569,8 +569,6 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
               </span>
             )}
         
-            <span className={statePill(b.state)}>{stateLabel(b.state)}</span>
-        
             <button
               type="button"
               onClick={(e) => {
