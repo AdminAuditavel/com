@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useSearchParams } from "next/navigation";
 import TopicModal, { type TopicDetail } from "@/app/components/TopicModal";
 
 type Bubble = {
@@ -17,6 +16,15 @@ type Bubble = {
 type CategoryBlock = {
   title: string;
   items: Bubble[];
+};
+
+type BubbleBoardProps = {
+  search?: string;
+  /**
+   * Offset do sticky featured para não ficar por baixo do header do Home.
+   * Ajuste fino se precisar.
+   */
+  headerOffsetPx?: number;
 };
 
 const INITIAL_DATA: CategoryBlock[] = [
@@ -214,11 +222,7 @@ function WaveBars({ id, state, energy }: { id: string; state: Bubble["state"]; e
   );
 }
 
-export default function BubbleBoard() {
-  // Search comes from the Home header via querystring (?q=...)
-  const searchParams = useSearchParams();
-  const search = (searchParams.get("q") ?? "").trim();
-
+export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: BubbleBoardProps) {
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
   const [selected, setSelected] = useState<TopicDetail | null>(null);
   const [liked, setLiked] = useState<Record<string, boolean>>({});
@@ -279,7 +283,7 @@ export default function BubbleBoard() {
   );
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase();
+    const q = search.trim().toLowerCase();
     if (!q) return itemsWithCategory;
     return itemsWithCategory.filter(
       (b) => b.label.toLowerCase().includes(q) || b.category.toLowerCase().includes(q)
@@ -515,14 +519,11 @@ export default function BubbleBoard() {
 
   return (
     <>
-      {/* IMPORTANT: BubbleBoard no longer renders its own top bar */}
       <div className="mx-auto w-full max-w-3xl px-4 pt-4">
-        {/* Sticky featured (offset = home header height). Adjust if needed. */}
-        <div ref={stickyRef} className="sticky top-[148px] z-20">
+        <div ref={stickyRef} className="sticky z-20" style={{ top: headerOffsetPx }}>
           {featured ? renderFeaturedCard(featured) : null}
         </div>
 
-        {/* Add padding-top so first item doesn't stick to featured */}
         <div className="flex flex-col gap-4 pb-24 pt-4">
           {flatList.map((b) => renderListCard(b))}
           <div style={{ height: 320 }} />
