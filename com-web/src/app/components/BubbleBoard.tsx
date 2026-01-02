@@ -9,7 +9,7 @@ type Bubble = {
   state: "hot" | "steady" | "cool";
   size: "lg" | "md" | "sm";
   energy: number; // 0..1
-  spark?: number; // trend %
+  spark?: number; // trend % (-1..+1 aproximado)
 };
 
 type CategoryBlock = {
@@ -62,127 +62,74 @@ function stateAccent(s: Bubble["state"]) {
   return { bg: "bg-white", border: "border-slate-200", text: "text-slate-500" };
 }
 
-// deterministic pseudo-random
-function hash32(str: string) {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = (h << 5) - h + str.charCodeAt(i);
-  return h >>> 0;
-}
-function makeSeededRand(seed: number) {
-  let s = seed || 1;
-  return () => {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 0xffffffff;
-  };
+function formatDeltaPct(v?: number) {
+  const n = typeof v === "number" ? v : 0;
+  const pct = Math.round(n * 100);
+  if (pct > 0) return `+${pct}%`;
+  return `${pct}%`;
 }
 
-// trend points determinísticos influenciados por "value" (spark)
-function makeTrendPointsDet(id: string, mode: "up" | "down", value: number) {
-  const rand = makeSeededRand(hash32(id + mode));
-  const base = 0.42 + (rand() * 0.12 - 0.06); // ~0.36..0.54
-  const totalDelta = clamp01(0.5 + value) - 0.5; // valor influencia inclinação
-  const pts: { t: number; v: number }[] = [];
-  let v = clamp01(base);
-  [0, 5, 10, 15].forEach((t, idx, arr) => {
-    if (idx > 0) {
-      const step = totalDelta / (arr.length - 1);
-      const jitter = rand() * 0.05 - 0.025;
-      v = clamp01(v + step + jitter);
-    }
-    pts.push({ t, v });
-  });
-  return pts;
+function TrendPill({ state, spark }: { state: Bubble["state"]; spark?: number }) {
+  const pct = formatDeltaPct(spark);
+  const abs = Math.abs((spark ?? 0) * 100);
+
+  // seta/símbolo simples e interpretável
+  const icon = spark && spark > 0.5 ? "↑" : spark && spark < -0.5 ? "↓" : spark && spark > 0 ? "↗" : spark && spark < 0 ? "↘" : "→";
+
+  // mensagem curta e sem “dashboard”
+  const label =
+    abs < 1 ? "quase estável" : spark && spark > 0 ? "subindo" : spark && spark < 0 ? "caindo" : "estável";
+
+  const cls =
+    state === "hot"
+      ? "bg-orange-100 border-orange-200 text-orange-900"
+      : state === "cool"
+      ? "bg-sky-100 border-sky-200 text-sky-900"
+      : "bg-slate-100 border-slate-200 text-slate-800";
+
+  return (
+    <div className={["inline-flex items-center gap-2 rounded-full border px-3 py-2", cls].join(" ")}>
+      <span className="text-sm font-semibold leading-none">{icon}</span>
+      <span className="text-sm font-semibold leading-none">{pct}</span>
+      <span className="text-xs font-medium text-slate-700/80">últimos 15 min · {label}</span>
+    </div>
+  );
 }
 
-function formatTimeLabel(offsetMin: number) {
-  const d = new Date(Date.now() - offsetMin * 60_000);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
+function HeatBar({ energy, state }: { energy: number; state: Bubble["state"] }) {
+  const v = clamp01(energy);
 
-function Sparkline({
-  id,
-  mode,
-  value,
-}: {
-  id: string;
-  mode: "up" | "down";
-  value: number;
-}) {
-  const pts = useMemo(() => makeTrendPointsDet(id, mode, value), [id, mode, value]);
+  // cor “semáforo” leve baseada no estado, mas sem exagero
+  const fill =
+    state === "hot" ? "bg-orange-400" : state === "cool" ? "bg-sky-400" : "bg-slate-400";
 
-  // Layout: SVG único com grid + linha + labels do eixo X dentro do próprio svg
-  const xPos = [4, 34, 66, 96]; // um pouco de padding lateral
-  const chartTop = 10;
-  const chartBottom = 86; // reserva base para eixo X
-  const yPos = (v: number) => chartTop + (1 - v) * (chartBottom - chartTop);
-
-  const path = pts
-    .map((p, i) => `${i === 0 ? "M" : "L"} ${xPos[i]},${yPos(p.v)}`)
-    .join(" ");
-  const lastY = yPos(pts[pts.length - 1].v);
-
-  const deltaPct = value ?? 0;
-  const times = [15, 10, 5, 0].map((m) => formatTimeLabel(m));
-  const gridLevels = [0, 0.25, 0.5, 1];
-
-  const stroke = mode === "up" ? "#f97316" : "#0ea5e9";
-  const fillTop = mode === "up" ? "#fb923c" : "#38bdf8";
-  const fillBottom = mode === "up" ? "#fdba74" : "#bae6fd";
+  // posição do marcador (0..100%)
+  const left = `${Math.round(v * 100)}%`;
 
   return (
     <div className="w-full">
-      <svg viewBox="0 0 100 110" className="w-full h-44">
-        {/* grid horizontal */}
-        {gridLevels.map((lv) => {
-          const yy = yPos(lv);
-          return (
-            <g key={lv}>
-              <line
-                x1={4}
-                x2={96}
-                y1={yy}
-                y2={yy}
-                stroke="#cbd5e1"
-                strokeWidth="0.8"
-                strokeDasharray="4 3"
-              />
-              <text x={96} y={yy + 3} textAnchor="end" className="text-[9px] fill-slate-500">
-                {Math.round(lv * 100)}%
-              </text>
-            </g>
-          );
-        })}
+      <div className="flex items-center justify-between text-[11px] text-slate-500 mb-2">
+        <span>Baixo</span>
+        <span>Médio</span>
+        <span>Alto</span>
+      </div>
 
-        <defs>
-          <linearGradient id={`grad-${id}-${mode}`} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor={fillTop} stopOpacity="0.7" />
-            <stop offset="100%" stopColor={fillBottom} stopOpacity="0.1" />
-          </linearGradient>
-        </defs>
+      <div className="relative h-3 w-full rounded-full bg-slate-200 overflow-hidden">
+        {/* preenchimento “grossão” */}
+        <div className={["absolute left-0 top-0 h-full", fill].join(" ")} style={{ width: left, opacity: 0.65 }} />
+        {/* marcador */}
+        <div
+          className="absolute top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-white border border-slate-300 shadow-sm"
+          style={{ left, transform: "translate(-50%, -50%)" }}
+        />
+      </div>
 
-        <path d={path} fill="none" stroke={stroke} strokeWidth={2.4} />
-        <polyline points={`4,110 96,110 96,${lastY}`} fill={`url(#grad-${id}-${mode})`} opacity="0.20" />
-        <circle r={3.8} fill={stroke} cx="96" cy={lastY} />
-        <text x="96" y={Math.max(12, lastY - 6)} textAnchor="end" className="text-[10px] fill-slate-700 font-semibold">
-          {deltaPct > 0 ? `+${Math.round(deltaPct * 100)}%` : `${Math.round(deltaPct * 100)}%`}
-        </text>
-
-        {/* eixo X (horários) dentro do svg */}
-        <line x1={4} x2={96} y1={94} y2={94} stroke="#e2e8f0" strokeWidth="1" />
-        {[0, 1, 2, 3].map((i) => (
-          <g key={i}>
-            <line x1={xPos[i]} x2={xPos[i]} y1={92} y2={96} stroke="#cbd5e1" strokeWidth="1" />
-            <text
-              x={xPos[i]}
-              y={106}
-              textAnchor={i === 0 ? "start" : i === 3 ? "end" : "middle"}
-              className="text-[10px] fill-slate-600"
-            >
-              {times[i]}
-            </text>
-          </g>
-        ))}
-      </svg>
+      <div className="mt-2 text-xs text-slate-600">
+        Nível de evidência:{" "}
+        <span className="font-semibold text-slate-900">
+          {v >= 0.72 ? "Alto" : v >= 0.45 ? "Médio" : "Baixo"}
+        </span>
+      </div>
     </div>
   );
 }
@@ -196,7 +143,7 @@ export default function BubbleBoard() {
   const CHANGE_MS = 10_000;
   const [tick, setTick] = useState(0);
 
-  // FIX: manter uma ordem estável por categoria (evita effect reiniciando a cada 160ms)
+  // ordem estável por categoria (evita effect reiniciar a cada 160ms)
   const orderRef = useRef(
     INITIAL_DATA.map((cat) => ({
       title: cat.title,
@@ -278,7 +225,7 @@ export default function BubbleBoard() {
     };
   }, [filtered]);
 
-  // Render order efetiva na tela (hot -> cool -> steady)
+  // ordem renderizada (hot -> cool -> steady)
   const renderOrderIds = useMemo(() => {
     const ids: string[] = [];
     grouped.hot.forEach((b) => ids.push(b.id));
@@ -287,14 +234,13 @@ export default function BubbleBoard() {
     return ids;
   }, [grouped]);
 
-  // “Card com gráfico” é o primeiro visível no scroll (vai mudando conforme rola)
+  // card “featured”: primeiro visível no scroll (vai mudando conforme rola)
   const [activeGraphId, setActiveGraphId] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const cardElsRef = useRef<Record<string, HTMLDivElement | null>>({});
   const rafRef = useRef<number | null>(null);
 
-  // garante um default coerente ao montar / mudar filtro
   useEffect(() => {
     setActiveGraphId(renderOrderIds[0] ?? null);
   }, [renderOrderIds]);
@@ -304,13 +250,13 @@ export default function BubbleBoard() {
     if (!sc) return;
 
     const top = sc.scrollTop;
-    const threshold = 16; // leve margem
+    const threshold = 16;
 
-    // escolhe o primeiro card cujo topo esteja >= top - threshold (primeiro “visível”)
     for (const id of renderOrderIds) {
       const el = cardElsRef.current[id];
       if (!el) continue;
-      const y = el.offsetTop; // relativo ao container (pois é filho direto)
+
+      const y = el.offsetTop;
       if (y + el.offsetHeight >= top + threshold) {
         setActiveGraphId((prev) => (prev === id ? prev : id));
         return;
@@ -331,7 +277,7 @@ export default function BubbleBoard() {
   }, [computeActiveGraph]);
 
   const cardSizes = (featured: boolean, idxInGroup: number) => {
-    if (featured) return "py-7 px-5"; // maior e mais “hero”
+    if (featured) return "py-7 px-5";
     if (idxInGroup === 0) return "py-5 px-4";
     if (idxInGroup <= 2) return "py-4 px-4";
     return "py-3 px-3";
@@ -340,7 +286,6 @@ export default function BubbleBoard() {
   const renderCard = (b: Bubble & { category: string }, idx: number, group: "hot" | "cool" | "steady") => {
     const accent = stateAccent(b.state);
     const likedState = liked[b.id];
-
     const isFeatured = activeGraphId === b.id;
 
     return (
@@ -349,10 +294,9 @@ export default function BubbleBoard() {
         ref={(el) => {
           cardElsRef.current[b.id] = el;
         }}
-        data-cardid={b.id}
         className={[
           "w-full text-left rounded-2xl border shadow-sm",
-          "flex flex-col gap-3",
+          "flex flex-col gap-4",
           "hover:shadow-md active:translate-y-[1px]",
           "transition",
           accent.bg,
@@ -396,13 +340,13 @@ export default function BubbleBoard() {
                 "rounded-full border px-2 py-1 text-[12px] font-semibold",
                 likedState ? "bg-rose-500 border-rose-500 text-white" : "bg-white border-slate-200 text-slate-600",
               ].join(" ")}
+              aria-label="Curtir"
             >
               ♥
             </button>
           </div>
         </div>
 
-        {/* Cabeçalho do assunto (mais forte quando featured) */}
         <div className="flex flex-col gap-1">
           <p
             className={[
@@ -418,14 +362,13 @@ export default function BubbleBoard() {
           </p>
         </div>
 
-        {/* Gráfico: agora “promove” conforme scroll (um por vez) e ocupa o card */}
+        {/* SINAL DE LEITURA RÁPIDA (featured) */}
         {isFeatured && (
-          <div className="mt-1 w-full">
-            <Sparkline
-              id={b.id}
-              mode={b.state === "cool" ? "down" : "up"}
-              value={b.spark ?? (b.state === "cool" ? -0.15 : 0.2)}
-            />
+          <div className="w-full rounded-2xl border border-slate-200 bg-white/70 p-4">
+            <div className="flex flex-col gap-3">
+              <TrendPill state={b.state} spark={b.spark ?? (b.state === "cool" ? -0.06 : 0.06)} />
+              <HeatBar energy={b.energy} state={b.state} />
+            </div>
           </div>
         )}
       </div>
