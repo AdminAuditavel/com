@@ -57,12 +57,6 @@ function stateLabel(s: Bubble["state"]) {
   return "Estável";
 }
 
-function stateAccent(s: Bubble["state"]) {
-  if (s === "hot") return { bg: "bg-orange-50", border: "border-orange-200" };
-  if (s === "cool") return { bg: "bg-sky-50", border: "border-sky-200" };
-  return { bg: "bg-white", border: "border-slate-200" };
-}
-
 function formatDeltaPct(v?: number) {
   const n = typeof v === "number" ? v : 0;
   const pct = Math.round(n * 100);
@@ -83,20 +77,27 @@ function TrendInline({ spark, state }: { spark?: number; state: Bubble["state"] 
       ? "↘"
       : "→";
 
-  const valueCls =
+  const pillCls =
     state === "hot"
-      ? "text-orange-700"
+      ? "bg-orange-100/70 text-orange-800 border-orange-200/60"
       : state === "cool"
-      ? "text-sky-700"
-      : "text-slate-700";
+      ? "bg-sky-100/70 text-sky-800 border-sky-200/60"
+      : "bg-slate-100/70 text-slate-700 border-slate-200/70";
 
   return (
-    <div className="shrink-0 text-right leading-tight">
-      <div className={["text-sm font-semibold", valueCls].join(" ")}>
-        <span className="mr-1">{icon}</span>
-        {pct}
+    <div className="shrink-0 text-right">
+      <div
+        className={[
+          "inline-flex items-center gap-1 rounded-full border px-2 py-1",
+          "text-sm font-semibold",
+          "backdrop-blur",
+          pillCls,
+        ].join(" ")}
+      >
+        <span className="leading-none">{icon}</span>
+        <span className="leading-none">{pct}</span>
       </div>
-      <div className="text-[11px] text-slate-500">últimos 15 min</div>
+      <div className="mt-1 text-[11px] text-slate-500">últimos 15 min</div>
     </div>
   );
 }
@@ -148,7 +149,15 @@ function WaveBars({ id, state, energy }: { id: string; state: Bubble["state"]; e
 
   return (
     <div className="w-full h-full">
-      <div className="relative w-full h-full rounded-2xl border border-slate-200 bg-white/70 overflow-hidden px-4 py-4">
+      <div
+        className={[
+          "relative w-full h-full rounded-3xl overflow-hidden",
+          "border border-slate-200/60",
+          "bg-white/70 backdrop-blur",
+          "shadow-[0_8px_22px_rgba(15,23,42,0.06)]",
+          "px-4 py-4",
+        ].join(" ")}
+      >
         <div className="absolute inset-0 px-4 py-4 flex items-end gap-[6px]">
           {bars.map((b) => (
             <div
@@ -375,46 +384,64 @@ export default function BubbleBoard() {
   }, [selected]);
 
   const cardChrome = (b: Bubble) => {
-    const accent = stateAccent(b.state);
+    const borderTint =
+      b.state === "hot"
+        ? "border-orange-200/60"
+        : b.state === "cool"
+        ? "border-sky-200/60"
+        : "border-slate-200/60";
+
     return [
-      "w-full text-left rounded-2xl border shadow-sm",
+      "w-full text-left rounded-3xl",
+      "border",
+      borderTint,
+      "bg-white/80 backdrop-blur",
+      "shadow-[0_10px_30px_rgba(15,23,42,0.06)]",
       "flex flex-col gap-4",
-      "transition",
-      accent.bg,
-      accent.border,
+      "transition-transform transition-shadow duration-200",
+      "hover:shadow-[0_14px_44px_rgba(15,23,42,0.10)]",
+      "active:scale-[0.99]",
     ].join(" ");
   };
+
+  const categoryPill = (category: string) =>
+    [
+      "rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide",
+      "border border-slate-200/60 bg-white/60 backdrop-blur",
+      category === "ESPORTES" ? "text-emerald-700" : "text-indigo-700",
+    ].join(" ");
+
+  const statePill = (state: Bubble["state"]) =>
+    [
+      "text-[12px] font-semibold px-2.5 py-1 rounded-full border backdrop-blur",
+      state === "hot"
+        ? "border-orange-200/60 bg-orange-100/60 text-orange-800"
+        : state === "cool"
+        ? "border-sky-200/60 bg-sky-100/60 text-sky-800"
+        : "border-slate-200/70 bg-slate-100/60 text-slate-700",
+    ].join(" ");
+
+  const likeButtonCls = (likedState: boolean) =>
+    [
+      "inline-flex items-center justify-center",
+      "w-9 h-9 rounded-full border",
+      "text-[18px] leading-none",
+      "transition-colors transition-transform duration-150",
+      "active:scale-110",
+      likedState
+        ? "bg-rose-500 border-rose-500 text-white shadow-sm"
+        : "bg-white/40 border-slate-200/80 text-slate-500 hover:border-slate-300 hover:text-slate-700",
+    ].join(" ");
 
   const renderFeaturedCard = (b: Bubble & { category: string }) => {
     const likedState = liked[b.id];
     return (
-      <div
-        className={[cardChrome(b), "shadow-md ring-2 ring-orange-200", "py-7 px-5"].join(" ")}
-        onClick={() => openTopic(b)}
-      >
+      <div className={[cardChrome(b), "p-6"].join(" ")} onClick={() => openTopic(b)}>
         <div className="flex items-center justify-between gap-2">
-          <span
-            className={[
-              "rounded-full px-3 py-[5px] text-[11px] font-semibold tracking-wide",
-              b.category === "ESPORTES" ? "bg-emerald-100 text-emerald-700" : "bg-indigo-100 text-indigo-700",
-            ].join(" ")}
-          >
-            {b.category}
-          </span>
+          <span className={categoryPill(b.category)}>{b.category}</span>
 
           <div className="flex items-center gap-2">
-            <span
-              className={[
-                "text-[12px] font-semibold px-2 py-1 rounded-full border",
-                b.state === "hot"
-                  ? "border-orange-200 bg-orange-100 text-orange-800"
-                  : b.state === "cool"
-                  ? "border-sky-200 bg-sky-100 text-sky-800"
-                  : "border-slate-200 bg-slate-100 text-slate-700",
-              ].join(" ")}
-            >
-              {stateLabel(b.state)}
-            </span>
+            <span className={statePill(b.state)}>{stateLabel(b.state)}</span>
 
             <button
               type="button"
@@ -422,16 +449,7 @@ export default function BubbleBoard() {
                 e.stopPropagation();
                 setLiked((prev) => ({ ...prev, [b.id]: !prev[b.id] }));
               }}
-              className={[
-                "inline-flex items-center justify-center",
-                "w-9 h-9",                 // tamanho do botão
-                "rounded-full border",
-                "text-[18px] leading-none", // coração maior e bem centralizado
-                "transition-colors",
-                likedState
-                  ? "bg-rose-500 border-rose-500 text-white"
-                  : "bg-transparent border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-700",
-              ].join(" ")}
+              className={likeButtonCls(likedState)}
               aria-label={likedState ? "Descurtir" : "Curtir"}
             >
               {likedState ? "♥" : "♡"}
@@ -441,8 +459,8 @@ export default function BubbleBoard() {
 
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <p className="text-2xl md:text-3xl font-semibold text-slate-900 leading-tight">{b.label}</p>
-            <p className="text-sm text-slate-600">Toque para ver detalhes</p>
+            <p className="text-[26px] md:text-[30px] font-semibold text-slate-900 leading-tight">{b.label}</p>
+            <p className="text-[13px] text-slate-600">Toque para ver detalhes</p>
           </div>
           <TrendInline spark={b.spark ?? (b.state === "cool" ? -0.06 : 0.06)} state={b.state} />
         </div>
@@ -456,7 +474,7 @@ export default function BubbleBoard() {
     );
   };
 
-  const renderListCard = (b: Bubble & { category: string; group: string }, idx: number) => {
+  const renderListCard = (b: Bubble & { category: string; group: string }) => {
     const likedState = liked[b.id];
     return (
       <div
@@ -464,32 +482,14 @@ export default function BubbleBoard() {
         ref={(el) => {
           cardElsRef.current[b.id] = el;
         }}
-        className={[cardChrome(b), idx === 0 ? "py-5 px-4" : "py-3 px-3", "hover:shadow-md active:translate-y-[1px]"].join(" ")}
+        className={[cardChrome(b), "p-4"].join(" ")}
         onClick={() => openTopic(b)}
       >
         <div className="flex items-center justify-between gap-2">
-          <span
-            className={[
-              "rounded-full px-3 py-[5px] text-[11px] font-semibold tracking-wide",
-              b.category === "ESPORTES" ? "bg-emerald-100 text-emerald-700" : "bg-indigo-100 text-indigo-700",
-            ].join(" ")}
-          >
-            {b.category}
-          </span>
+          <span className={categoryPill(b.category)}>{b.category}</span>
 
           <div className="flex items-center gap-2">
-            <span
-              className={[
-                "text-[12px] font-semibold px-2 py-1 rounded-full border",
-                b.state === "hot"
-                  ? "border-orange-200 bg-orange-100 text-orange-800"
-                  : b.state === "cool"
-                  ? "border-sky-200 bg-sky-100 text-sky-800"
-                  : "border-slate-200 bg-slate-100 text-slate-700",
-              ].join(" ")}
-            >
-              {stateLabel(b.state)}
-            </span>
+            <span className={statePill(b.state)}>{stateLabel(b.state)}</span>
 
             <button
               type="button"
@@ -497,16 +497,7 @@ export default function BubbleBoard() {
                 e.stopPropagation();
                 setLiked((prev) => ({ ...prev, [b.id]: !prev[b.id] }));
               }}
-              className={[
-                "inline-flex items-center justify-center",
-                "w-9 h-9",                 // tamanho do botão
-                "rounded-full border",
-                "text-[18px] leading-none", // coração maior e bem centralizado
-                "transition-colors",
-                likedState
-                  ? "bg-rose-500 border-rose-500 text-white"
-                  : "bg-transparent border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-700",
-              ].join(" ")}
+              className={likeButtonCls(likedState)}
               aria-label={likedState ? "Descurtir" : "Curtir"}
             >
               {likedState ? "♥" : "♡"}
@@ -515,8 +506,8 @@ export default function BubbleBoard() {
         </div>
 
         <div className="flex flex-col gap-1">
-          <p className="text-base font-semibold text-slate-900 leading-tight">{b.label}</p>
-          <p className="text-sm text-slate-500">Toque para ver detalhes</p>
+          <p className="text-[16px] font-semibold text-slate-900 leading-tight">{b.label}</p>
+          <p className="text-[13px] text-slate-500">Toque para ver detalhes</p>
         </div>
       </div>
     );
@@ -525,27 +516,37 @@ export default function BubbleBoard() {
   return (
     <>
       <div className="w-full bg-slate-50 min-h-screen">
-        {/* Search sticky */}
-        <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur px-4 pt-4 pb-2 border-b border-slate-200">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar tema ou categoria..."
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-          />
+        {/* Top bar (iOS clean) */}
+        <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-xl px-4 pt-3 pb-3 border-b border-slate-200/60">
+          <div className="mx-auto w-full max-w-3xl">
+            <div className="mb-2">
+              <h1 className="text-[17px] font-semibold text-slate-900">Tendências</h1>
+              <p className="text-[12px] text-slate-500">Atualiza automaticamente</p>
+            </div>
+
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                ⌕
+              </span>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar tema ou categoria..."
+                className="w-full h-11 rounded-2xl border border-slate-200/70 bg-white/70 pl-9 pr-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+              />
+            </div>
+          </div>
         </div>
 
         <div className="mx-auto w-full max-w-3xl px-4 pt-4">
           {/* Featured sticky (card principal fixo) */}
-          <div ref={stickyRef} className="sticky top-[78px] z-20">
+          <div ref={stickyRef} className="sticky top-[112px] z-20">
             {featured ? renderFeaturedCard(featured) : null}
           </div>
 
           {/* Lista sem scroll interno, usa scroll da janela */}
           <div className="flex flex-col gap-4 pb-24">
-            {/* pequeno espaçador superior */}
-            <div style={{ height: 0 }} />
-            {flatList.map((b, idx) => renderListCard(b, idx))}
+            {flatList.map((b) => renderListCard(b, b.id === flatList[0]?.id ? 0 : 1))}
             {/* espaçador inferior para permitir cruzar o alvo */}
             <div style={{ height: 320 }} />
           </div>
