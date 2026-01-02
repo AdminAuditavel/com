@@ -554,10 +554,23 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
       <div className={[cardChrome(b), "p-6"].join(" ")} onClick={() => openTopic(b)}>
         <div className="flex items-center justify-between gap-2">
           <span className={categoryPill(b.category)}>{b.category}</span>
-
+        
           <div className="flex items-center gap-2">
+            {badge && (
+              <span
+                className={[
+                  "inline-flex items-center rounded-full border px-2.5 py-1",
+                  "text-[12px] font-semibold tracking-tight",
+                  "shadow-sm",
+                  badge.cls,
+                ].join(" ")}
+              >
+                {badge.text}
+              </span>
+            )}
+        
             <span className={statePill(b.state)}>{stateLabel(b.state)}</span>
-
+        
             <button
               type="button"
               onClick={(e) => {
@@ -576,20 +589,6 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
           <div className="min-w-0 flex-1">
             <p className="text-[26px] md:text-[30px] font-semibold text-slate-900 leading-tight">{b.label}</p>
             <p className="text-[13px] text-slate-600">Toque para ver detalhes</p>
-           {badge && (
-            <div className="mt-2">
-              <span
-                className={[
-                  "inline-flex items-center rounded-full border px-3 py-1",
-                  "text-[12px] font-semibold tracking-tight",
-                  "shadow-sm",
-                  badge.cls,
-                ].join(" ")}
-              >
-                {badge.text}
-              </span>
-            </div>
-          )} 
           </div>
           <TrendInline spark={b.spark ?? 0} state={b.state} />
         </div>
