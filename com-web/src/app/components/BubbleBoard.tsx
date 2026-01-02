@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import TopicModal, { type TopicDetail } from "@/app/components/TopicModal";
-import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 
 type Bubble = {
   id: string;
@@ -224,11 +223,8 @@ export default function BubbleBoard() {
     const likedState = liked[b.id];
 
     return (
-      <motion.button
-        layout
+      <div
         key={`${group}-${b.id}`}
-        type="button"
-        onClick={() => setSelected(asDetail(b))}
         className={[
           "w-full text-left rounded-2xl border shadow-sm",
           "flex flex-col gap-3",
@@ -238,6 +234,7 @@ export default function BubbleBoard() {
           accent.border,
           cardSizes(idx),
         ].join(" ")}
+        onClick={() => setSelected(asDetail(b))}
       >
         <div className="flex items-center justify-between gap-2">
           <span
@@ -297,18 +294,15 @@ export default function BubbleBoard() {
             />
           </div>
         )}
-      </motion.button>
+      </div>
     );
   };
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const y = useMotionValue(0);
-  const opacity = useTransform(y, [0, 60], [1, 0.92]);
-
   const onScroll = useCallback(() => {
-    if (!scrollRef.current) return;
-    y.set(scrollRef.current.scrollTop);
-  }, [y]);
+    // placeholder in case we need scroll handling later
+    scrollRef.current?.scrollTop;
+  }, []);
 
   return (
     <>
@@ -328,23 +322,9 @@ export default function BubbleBoard() {
           className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-12 pt-4 overflow-y-auto"
           style={{ minHeight: "calc(100vh - 80px)" }}
         >
-          <AnimatePresence initial={false}>
-            {grouped.hot.map((b, idx) => (
-              <motion.div key={`hot-${b.id}`} layout style={{ opacity }}>
-                {renderCard(b, idx, "hot")}
-              </motion.div>
-            ))}
-            {grouped.cool.map((b, idx) => (
-              <motion.div key={`cool-${b.id}`} layout style={{ opacity }}>
-                {renderCard(b, idx, "cool")}
-              </motion.div>
-            ))}
-            {grouped.steady.map((b, idx) => (
-              <motion.div key={`steady-${b.id}`} layout style={{ opacity }}>
-                {renderCard(b, idx, "steady")}
-              </motion.div>
-            ))}
-          </AnimatePresence>
+          {grouped.hot.length > 0 && grouped.hot.map((b, idx) => renderCard(b, idx, "hot"))}
+          {grouped.cool.length > 0 && grouped.cool.map((b, idx) => renderCard(b, idx, "cool"))}
+          {grouped.steady.length > 0 && grouped.steady.map((b, idx) => renderCard(b, idx, "steady"))}
         </div>
       </div>
 
