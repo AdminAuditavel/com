@@ -85,19 +85,11 @@ function MiniChart({
   const t5 = new Date(now.getTime() - 5 * 60 * 1000);
   const t0 = now;
 
-  // contorno escuro (para legibilidade sem “placa branca”)
-  const outline = {
-    paintOrder: "stroke" as const,
-    stroke: "rgba(2, 6, 23, 0.35)",
-    strokeWidth: 3,
-    strokeLinejoin: "round" as const,
-  };
-
   const labelX = width - pad; // alinhar no limite direito
 
   return (
     <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-      {/* grid mais escura (antes era #e5e7eb) */}
+      {/* grid mais escura */}
       <g opacity="1">
         {[0.2, 0.5, 0.8].map((v) => {
           const y = yAt(v, height, pad);
@@ -118,12 +110,12 @@ function MiniChart({
       <path d={path} fill="none" stroke={color} strokeWidth="2.4" />
       <circle cx={endX} cy={endY} r="3.8" fill={color} />
 
-      {/* LABEL alinhado à direita */}
+      {/* LABEL alinhado à direita (sem contorno) */}
       <g>
-        <text x={labelX} y={labelY} fontSize="11" fill="rgba(2, 6, 23, 0.80)" textAnchor="end" style={outline}>
+        <text x={labelX} y={labelY} fontSize="11" fill="rgba(2, 6, 23, 0.80)" textAnchor="end">
           {name}
         </text>
-        <text x={labelX} y={labelY + 18} fontSize="14" fill={color} fontWeight={800} textAnchor="end" style={outline}>
+        <text x={labelX} y={labelY + 18} fontSize="14" fill={color} fontWeight={800} textAnchor="end">
           {arrow}
           {pct}%
         </text>
@@ -131,16 +123,16 @@ function MiniChart({
 
       {showXAxis && (
         <g fill="rgba(2, 6, 23, 0.55)" fontSize="10">
-          <text x={xAt(0, width, pad)} y={height - 2} style={outline}>
+          <text x={xAt(0, width, pad)} y={height - 2}>
             {fmtTime(t15)}
           </text>
-          <text x={xAt(5, width, pad) - 10} y={height - 2} style={outline}>
+          <text x={xAt(5, width, pad) - 10} y={height - 2}>
             {fmtTime(t10)}
           </text>
-          <text x={xAt(10, width, pad) - 10} y={height - 2} style={outline}>
+          <text x={xAt(10, width, pad) - 10} y={height - 2}>
             {fmtTime(t5)}
           </text>
-          <text x={xAt(15, width, pad) - 22} y={height - 2} style={outline}>
+          <text x={xAt(15, width, pad) - 22} y={height - 2}>
             {fmtTime(t0)}
           </text>
         </g>
