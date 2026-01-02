@@ -94,12 +94,18 @@ function TopicCard({ bubble, onClick, size = "sm", emphasize }: TopicCardProps) 
       : state === "cool"
       ? "bg-sky-50 border-sky-200"
       : "bg-white border-slate-200";
-  const tailPalette =
+  const tailBorder =
     state === "hot"
-      ? "bg-orange-50 border-orange-200"
+      ? "border-orange-200"
       : state === "cool"
-      ? "bg-sky-50 border-sky-200"
-      : "bg-white border-slate-200";
+      ? "border-sky-200"
+      : "border-slate-200";
+  const tailBg =
+    state === "hot"
+      ? "bg-orange-50"
+      : state === "cool"
+      ? "bg-sky-50"
+      : "bg-white";
 
   return (
     <button
@@ -107,20 +113,23 @@ function TopicCard({ bubble, onClick, size = "sm", emphasize }: TopicCardProps) 
       onClick={onClick}
       className={[
         "relative overflow-visible",
-        "flex flex-col justify-between rounded-2xl border shadow-sm",
+        "flex flex-col justify-between",
+        "rounded-[10px] border shadow-sm",
         "transition hover:-translate-y-[1px] hover:shadow-md active:translate-y-0",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400",
         sizing,
         palette,
       ].join(" ")}
     >
-      {/* cauda do balão (message-square) */}
+      {/* cauda do balão (message-square) centralizada */}
       <span
         aria-hidden="true"
         className={[
-          "absolute -bottom-2 left-3 w-3 h-3 rotate-45",
-          tailPalette,
-          "border-t border-l",
+          "pointer-events-none absolute -bottom-2 left-1/2 -translate-x-1/2",
+          "w-3.5 h-3.5 rotate-45",
+          tailBg,
+          tailBorder,
+          "border-l border-t",
         ].join(" ")}
       />
       <div className="flex items-center justify-between gap-1">
