@@ -75,54 +75,91 @@ function makeSeededRand(seed: number) {
     return s / 0xffffffff;
   };
 }
-function makeTrendPointsDet(id: string, mode: "up" | "down") {
+
+// trend points determinísticos influenciados por "value" (spark)
+function makeTrendPointsDet(id: string, mode: "up" | "down", value: number) {
   const rand = makeSeededRand(hash32(id + mode));
-  let v = mode === "up" ? 0.42 : 0.68;
+  const base = 0.42 + (rand() * 0.12 - 0.06); // ~0.36..0.54
+  const totalDelta = clamp01(0.5 + value) - 0.5; // valor influencia inclinação
   const pts: { t: number; v: number }[] = [];
-  [0, 5, 10, 15].forEach((t) => {
-    const drift = mode === "up" ? 0.045 : -0.045;
-    const jitter = rand() * 0.06 - 0.03;
-    v = clamp01(v + drift + jitter);
+  let v = clamp01(base);
+  [0, 5, 10, 15].forEach((t, idx, arr) => {
+    if (idx > 0) {
+      const step = totalDelta / (arr.length - 1);
+      const jitter = rand() * 0.05 - 0.025;
+      v = clamp01(v + step + jitter);
+    }
     pts.push({ t, v });
   });
   return pts;
 }
 
+function formatTimeLabel(offsetMin: number) {
+  const d = new Date(Date.now() - offsetMin * 60_000);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 function Sparkline({ id, mode, value }: { id: string; mode: "up" | "down"; value: number }) {
-  const pts = useMemo(() => makeTrendPointsDet(id, mode), [id, mode]);
+  const pts = useMemo(() => makeTrendPointsDet(id, mode, value), [id, mode, value]);
   const path = useMemo(() => {
-    const maxT = 15;
-    const x = (t: number) => (t / maxT) * 100;
-    const y = (v: number) => 100 - v * 90;
+    const xs = [0, 33.3, 66.6, 100];
+    const x = (_: number, i: number) => xs[i];
+    const y = (v: number) => 8 + (1 - v) * 84; // padding 8 top/bottom
     return pts
-      .map((p, i) => `${i === 0 ? "M" : "L"} ${x(p.t)},${y(p.v)}`)
+      .map((p, i) => `${i === 0 ? "M" : "L"} ${x(p.t, i)},${y(p.v)}`)
       .join(" ");
   }, [pts]);
 
-  const lastY = 100 - pts[pts.length - 1].v * 90;
+  const lastY = 8 + (1 - pts[pts.length - 1].v) * 84;
   const deltaPct = value ?? 0;
+  const times = [15, 10, 5, 0].map((m) => formatTimeLabel(m));
+  const gridLevels = [0, 0.25, 0.5, 1];
 
   return (
     <div className="w-full">
-      <svg viewBox="0 0 100 100" className="h-20 w-full">
+      <svg viewBox="0 0 120 110" className="h-28 w-full">
+        {/* grid horizontal */}
+        {gridLevels.map((lv) => {
+          const yy = 8 + (1 - lv) * 84;
+          return (
+            <g key={lv}>
+              <line
+                x1={0}
+                x2={100}
+                y1={yy}
+                y2={yy}
+                stroke="#cbd5e1"
+                strokeWidth="0.8"
+                strokeDasharray="4 3"
+              />
+              <text
+                x={104}
+                y={yy + 3}
+                className="text-[9px] fill-slate-500"
+              >
+                {Math.round(lv * 100)}%
+              </text>
+            </g>
+          );
+        })}
+
         <defs>
           <linearGradient id={`grad-${id}-${mode}`} x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor={mode === "up" ? "#fb923c" : "#38bdf8"} stopOpacity="0.7" />
             <stop offset="100%" stopColor={mode === "up" ? "#fdba74" : "#bae6fd"} stopOpacity="0.1" />
           </linearGradient>
         </defs>
-        <path d={path} fill="none" stroke={mode === "up" ? "#f97316" : "#0ea5e9"} strokeWidth={2.4} />
+        <path d={path} fill="none" stroke={mode === "up" ? "#f97316" : "#0ea5e9"} strokeWidth={2.2} />
+        <polyline points={`0,110 100,110 100,${lastY}`} fill={`url(#grad-${id}-${mode})`} opacity="0.18" />
         <circle r={3.6} fill={mode === "up" ? "#f97316" : "#0ea5e9"} cx="100" cy={lastY} />
-        <text x="100" y={lastY - 4} textAnchor="end" className="text-[9px] fill-slate-700">
+        <text x="100" y={lastY - 5} textAnchor="end" className="text-[10px] fill-slate-700 font-semibold">
           {deltaPct > 0 ? `+${Math.round(deltaPct * 100)}%` : `${Math.round(deltaPct * 100)}%`}
         </text>
-        <polyline points={`0,100 100,100 100,${lastY}`} fill={`url(#grad-${id}-${mode})`} opacity="0.18" />
       </svg>
-      <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-        <span>−15 min</span>
-        <span>−10</span>
-        <span>−5</span>
-        <span>agora</span>
+      <div className="flex justify-between text-[11px] text-slate-600 mt-1 px-1">
+        {times.map((t) => (
+          <span key={t}>{t}</span>
+        ))}
       </div>
     </div>
   );
@@ -212,7 +249,7 @@ export default function BubbleBoard() {
   }, [filtered]);
 
   const cardSizes = (idx: number) => {
-    if (idx === 0) return "py-5 px-4 text-base";
+    if (idx === 0) return "py-6 px-4 text-base"; // maior
     if (idx <= 2) return "py-4 px-4 text-sm";
     return "py-3 px-3 text-sm";
   };
@@ -276,7 +313,9 @@ export default function BubbleBoard() {
 
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
-            <p className="text-base font-semibold text-slate-900 leading-tight">{b.label}</p>
+            <p className={isMain ? "text-lg font-semibold text-slate-900 leading-tight" : "text-base font-semibold text-slate-900 leading-tight"}>
+              {b.label}
+            </p>
             <p className="mt-1 text-sm text-slate-500">Toque para ver detalhes</p>
           </div>
           <div className="shrink-0 text-right text-xs text-slate-500">
@@ -300,7 +339,7 @@ export default function BubbleBoard() {
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const onScroll = useCallback(() => {
-    // placeholder in case we need scroll handling later
+    // reservado para sticky behaviors futuros
     scrollRef.current?.scrollTop;
   }, []);
 
