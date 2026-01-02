@@ -438,7 +438,7 @@ export default function BubbleBoard() {
             <p className="text-2xl md:text-3xl font-semibold text-slate-900 leading-tight">{b.label}</p>
             <p className="text-sm text-slate-600">Toque para ver detalhes</p>
           </div>
-          <TrendInline spark={b.spark ?? (b.state === "cool" ? -0.06 : 0.06)} />
+          <TrendInline spark={b.spark ?? (b.state === "cool" ? -0.06 : 0.06)} state={b.state} />
         </div>
 
         <div className="w-full">
