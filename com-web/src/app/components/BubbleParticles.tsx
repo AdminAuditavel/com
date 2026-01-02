@@ -20,14 +20,16 @@ function rand(min: number, max: number) {
 
 export default function BubbleParticles({
   getSourceRect,
-  direction,
+  mode, // "in" = partículas entram na bolha; "out" = partículas saem
   colorVar,
   active,
+  intensity = 14,
 }: {
   getSourceRect: () => DOMRect | null;
-  direction: "up" | "down";
+  mode: "in" | "out";
   colorVar: string;
   active: boolean;
+  intensity?: number; // partículas por segundo aprox
 }) {
   const [particles, setParticles] = useState<Particle[]>([]);
   const timersRef = useRef<number[]>([]);
@@ -43,8 +45,8 @@ export default function BubbleParticles({
   useEffect(() => {
     if (!active) return;
 
-    const TICK_MS = 80;
-    const PPS = 16;
+    const TICK_MS = 90;
+    const PPS = intensity;
 
     const interval = window.setInterval(() => {
       const rect = getSourceRect();
@@ -63,33 +65,59 @@ export default function BubbleParticles({
 
       for (let i = 0; i < toSpawn; i++) {
         const size = rand(6, 10);
-        const durMs = Math.round(rand(700, 1200));
+        const durMs = Math.round(rand(750, 1200));
 
-        const x0 = cx + rand(-rect.width * 0.25, rect.width * 0.25);
-        const y0 = cy + rand(-rect.height * 0.15, rect.height * 0.15);
+        if (mode === "out") {
+          // nasce no centro e vai para fora
+          const x0 = cx + rand(-rect.width * 0.12, rect.width * 0.12);
+          const y0 = cy + rand(-rect.height * 0.12, rect.height * 0.12);
 
-        const dy = direction === "up" ? -rand(120, 200) : rand(120, 200);
-        const x1 = x0 + rand(-18, 18);
-        const y1 = y0 + dy;
+          const x1 = cx + rand(-rect.width * 0.9, rect.width * 0.9);
+          const y1 = cy + rand(-220, 220);
 
-        const p: Particle = {
-          id: crypto.randomUUID(),
-          x0,
-          y0,
-          x1,
-          y1,
-          durMs,
-          size,
-          color: colorVar,
-          opacity: rand(0.35, 0.85),
-        };
+          const p: Particle = {
+            id: crypto.randomUUID(),
+            x0,
+            y0,
+            x1,
+            y1,
+            durMs,
+            size,
+            color: colorVar,
+            opacity: rand(0.35, 0.85),
+          };
+          newOnes.push(p);
 
-        newOnes.push(p);
+          const removeT = window.setTimeout(() => {
+            setParticles((prev) => prev.filter((it) => it.id !== p.id));
+          }, durMs + 60);
+          timersRef.current.push(removeT);
+        } else {
+          // mode === "in": nasce ao redor e vai para o centro
+          const x0 = cx + rand(-rect.width * 0.9, rect.width * 0.9);
+          const y0 = cy + rand(-220, 220);
 
-        const removeT = window.setTimeout(() => {
-          setParticles((prev) => prev.filter((it) => it.id !== p.id));
-        }, durMs + 60);
-        timersRef.current.push(removeT);
+          const x1 = cx + rand(-rect.width * 0.10, rect.width * 0.10);
+          const y1 = cy + rand(-rect.height * 0.10, rect.height * 0.10);
+
+          const p: Particle = {
+            id: crypto.randomUUID(),
+            x0,
+            y0,
+            x1,
+            y1,
+            durMs,
+            size,
+            color: colorVar,
+            opacity: rand(0.35, 0.85),
+          };
+          newOnes.push(p);
+
+          const removeT = window.setTimeout(() => {
+            setParticles((prev) => prev.filter((it) => it.id !== p.id));
+          }, durMs + 60);
+          timersRef.current.push(removeT);
+        }
       }
 
       setParticles((prev) => {
@@ -99,7 +127,7 @@ export default function BubbleParticles({
     }, TICK_MS);
 
     return () => window.clearInterval(interval);
-  }, [active, direction, colorVar, getSourceRect]);
+  }, [active, mode, colorVar, getSourceRect, intensity]);
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[55]" aria-hidden="true">
@@ -118,7 +146,7 @@ export default function BubbleParticles({
               border: `1px solid color-mix(in srgb, ${p.color} 55%, transparent)`,
               opacity: p.opacity,
               transform: `translate(${p.x0}px, ${p.y0}px)`,
-              animation: `bubbleParticleMove ${p.durMs}ms ease-out forwards`,
+              animation: `bubbleParticleMove ${p.durMs}ms ease-in-out forwards`,
               ["--x0" as any]: `${p.x0}px`,
               ["--y0" as any]: `${p.y0}px`,
               ["--x1" as any]: `${p.x1}px`,
