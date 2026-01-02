@@ -516,14 +516,9 @@ export default function BubbleBoard() {
   return (
     <>
       <div className="w-full bg-slate-50 min-h-screen">
-        {/* Top bar (iOS clean) */}
-        <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-xl px-4 pt-3 pb-3 border-b border-slate-200/60">
+        {/* Search sticky (sem título/subtítulo) */}
+        <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-xl px-4 py-3 border-b border-slate-200/60">
           <div className="mx-auto w-full max-w-3xl">
-            <div className="mb-2">
-              <h1 className="text-[17px] font-semibold text-slate-900">Tendências</h1>
-              <p className="text-[12px] text-slate-500">Atualiza automaticamente</p>
-            </div>
-
             <div className="relative">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                 ⌕
@@ -540,12 +535,13 @@ export default function BubbleBoard() {
 
         <div className="mx-auto w-full max-w-3xl px-4 pt-4">
           {/* Featured sticky (card principal fixo) */}
-          <div ref={stickyRef} className="sticky top-[112px] z-20">
+          <div ref={stickyRef} className="sticky top-[76px] z-20">
             {featured ? renderFeaturedCard(featured) : null}
           </div>
 
           {/* Lista sem scroll interno, usa scroll da janela */}
-          <div className="flex flex-col gap-4 pb-24">
+          <div className="flex flex-col gap-4 pb-24 pt-4">
+            {/* pt-4 cria o mesmo espaçamento do gap entre o card sticky e o 1º card */}
             {flatList.map((b) => renderListCard(b))}
             <div style={{ height: 320 }} />
           </div>
