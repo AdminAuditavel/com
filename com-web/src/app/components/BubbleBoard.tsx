@@ -99,42 +99,54 @@ function formatTimeLabel(offsetMin: number) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-function Sparkline({ id, mode, value }: { id: string; mode: "up" | "down"; value: number }) {
+function Sparkline({
+  id,
+  mode,
+  value,
+}: {
+  id: string;
+  mode: "up" | "down";
+  value: number;
+}) {
   const pts = useMemo(() => makeTrendPointsDet(id, mode, value), [id, mode, value]);
-  const xPos = [0, 33.3, 66.6, 100];
-  const yPos = (v: number) => 8 + (1 - v) * 84; // padding top/bottom
+
+  // Layout: SVG único com grid + linha + labels do eixo X dentro do próprio svg
+  const xPos = [4, 34, 66, 96]; // um pouco de padding lateral
+  const chartTop = 10;
+  const chartBottom = 86; // reserva base para eixo X
+  const yPos = (v: number) => chartTop + (1 - v) * (chartBottom - chartTop);
 
   const path = pts
     .map((p, i) => `${i === 0 ? "M" : "L"} ${xPos[i]},${yPos(p.v)}`)
     .join(" ");
   const lastY = yPos(pts[pts.length - 1].v);
+
   const deltaPct = value ?? 0;
   const times = [15, 10, 5, 0].map((m) => formatTimeLabel(m));
   const gridLevels = [0, 0.25, 0.5, 1];
 
+  const stroke = mode === "up" ? "#f97316" : "#0ea5e9";
+  const fillTop = mode === "up" ? "#fb923c" : "#38bdf8";
+  const fillBottom = mode === "up" ? "#fdba74" : "#bae6fd";
+
   return (
     <div className="w-full">
-      <svg viewBox="0 0 100 110" className="h-32 w-full">
-        {/* grid horizontal dentro da largura total */}
+      <svg viewBox="0 0 100 110" className="w-full h-44">
+        {/* grid horizontal */}
         {gridLevels.map((lv) => {
           const yy = yPos(lv);
           return (
             <g key={lv}>
               <line
-                x1={0}
-                x2={100}
+                x1={4}
+                x2={96}
                 y1={yy}
                 y2={yy}
                 stroke="#cbd5e1"
                 strokeWidth="0.8"
                 strokeDasharray="4 3"
               />
-              <text
-                x={99}
-                y={yy + 3}
-                textAnchor="end"
-                className="text-[9px] fill-slate-500"
-              >
+              <text x={96} y={yy + 3} textAnchor="end" className="text-[9px] fill-slate-500">
                 {Math.round(lv * 100)}%
               </text>
             </g>
@@ -143,22 +155,34 @@ function Sparkline({ id, mode, value }: { id: string; mode: "up" | "down"; value
 
         <defs>
           <linearGradient id={`grad-${id}-${mode}`} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor={mode === "up" ? "#fb923c" : "#38bdf8"} stopOpacity="0.7" />
-            <stop offset="100%" stopColor={mode === "up" ? "#fdba74" : "#bae6fd"} stopOpacity="0.1" />
+            <stop offset="0%" stopColor={fillTop} stopOpacity="0.7" />
+            <stop offset="100%" stopColor={fillBottom} stopOpacity="0.1" />
           </linearGradient>
         </defs>
-        <path d={path} fill="none" stroke={mode === "up" ? "#f97316" : "#0ea5e9"} strokeWidth={2.2} />
-        <polyline points={`0,110 100,110 100,${lastY}`} fill={`url(#grad-${id}-${mode})`} opacity="0.18" />
-        <circle r={3.8} fill={mode === "up" ? "#f97316" : "#0ea5e9"} cx="100" cy={lastY} />
-        <text x="100" y={lastY - 5} textAnchor="end" className="text-[10px] fill-slate-700 font-semibold">
+
+        <path d={path} fill="none" stroke={stroke} strokeWidth={2.4} />
+        <polyline points={`4,110 96,110 96,${lastY}`} fill={`url(#grad-${id}-${mode})`} opacity="0.20" />
+        <circle r={3.8} fill={stroke} cx="96" cy={lastY} />
+        <text x="96" y={Math.max(12, lastY - 6)} textAnchor="end" className="text-[10px] fill-slate-700 font-semibold">
           {deltaPct > 0 ? `+${Math.round(deltaPct * 100)}%` : `${Math.round(deltaPct * 100)}%`}
         </text>
-      </svg>
-      <div className="flex justify-between text-[11px] text-slate-600 mt-1">
-        {times.map((t) => (
-          <span key={t}>{t}</span>
+
+        {/* eixo X (horários) dentro do svg */}
+        <line x1={4} x2={96} y1={94} y2={94} stroke="#e2e8f0" strokeWidth="1" />
+        {[0, 1, 2, 3].map((i) => (
+          <g key={i}>
+            <line x1={xPos[i]} x2={xPos[i]} y1={92} y2={96} stroke="#cbd5e1" strokeWidth="1" />
+            <text
+              x={xPos[i]}
+              y={106}
+              textAnchor={i === 0 ? "start" : i === 3 ? "end" : "middle"}
+              className="text-[10px] fill-slate-600"
+            >
+              {times[i]}
+            </text>
+          </g>
         ))}
-      </div>
+      </svg>
     </div>
   );
 }
@@ -172,23 +196,31 @@ export default function BubbleBoard() {
   const CHANGE_MS = 10_000;
   const [tick, setTick] = useState(0);
 
+  // FIX: manter uma ordem estável por categoria (evita effect reiniciando a cada 160ms)
+  const orderRef = useRef(
+    INITIAL_DATA.map((cat) => ({
+      title: cat.title,
+      ids: cat.items.map((b) => b.id),
+    }))
+  );
+
   useEffect(() => {
     const t = window.setInterval(() => setTick((x) => x + 1), CHANGE_MS);
     return () => window.clearInterval(t);
   }, []);
 
   const hotCoolByCategory = useMemo(() => {
-    return data.map((cat) => {
-      const len = cat.items.length || 1;
+    return orderRef.current.map((c) => {
+      const len = c.ids.length || 1;
       const hotIdx = tick % len;
       const coolIdx = (tick + 1) % len;
       return {
-        title: cat.title,
-        hotId: cat.items[hotIdx]?.id,
-        coolId: cat.items[coolIdx]?.id,
+        title: c.title,
+        hotId: c.ids[hotIdx],
+        coolId: c.ids[coolIdx],
       };
     });
-  }, [data, tick]);
+  }, [tick]);
 
   useEffect(() => {
     const hotIds = new Set<string>();
@@ -246,20 +278,78 @@ export default function BubbleBoard() {
     };
   }, [filtered]);
 
-  const cardSizes = (idx: number) => {
-    if (idx === 0) return "py-6 px-4 text-base"; // maior
-    if (idx <= 2) return "py-4 px-4 text-sm";
-    return "py-3 px-3 text-sm";
+  // Render order efetiva na tela (hot -> cool -> steady)
+  const renderOrderIds = useMemo(() => {
+    const ids: string[] = [];
+    grouped.hot.forEach((b) => ids.push(b.id));
+    grouped.cool.forEach((b) => ids.push(b.id));
+    grouped.steady.forEach((b) => ids.push(b.id));
+    return ids;
+  }, [grouped]);
+
+  // “Card com gráfico” é o primeiro visível no scroll (vai mudando conforme rola)
+  const [activeGraphId, setActiveGraphId] = useState<string | null>(null);
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const cardElsRef = useRef<Record<string, HTMLDivElement | null>>({});
+  const rafRef = useRef<number | null>(null);
+
+  // garante um default coerente ao montar / mudar filtro
+  useEffect(() => {
+    setActiveGraphId(renderOrderIds[0] ?? null);
+  }, [renderOrderIds]);
+
+  const computeActiveGraph = useCallback(() => {
+    const sc = scrollRef.current;
+    if (!sc) return;
+
+    const top = sc.scrollTop;
+    const threshold = 16; // leve margem
+
+    // escolhe o primeiro card cujo topo esteja >= top - threshold (primeiro “visível”)
+    for (const id of renderOrderIds) {
+      const el = cardElsRef.current[id];
+      if (!el) continue;
+      const y = el.offsetTop; // relativo ao container (pois é filho direto)
+      if (y + el.offsetHeight >= top + threshold) {
+        setActiveGraphId((prev) => (prev === id ? prev : id));
+        return;
+      }
+    }
+  }, [renderOrderIds]);
+
+  const onScroll = useCallback(() => {
+    if (rafRef.current) return;
+    rafRef.current = window.requestAnimationFrame(() => {
+      rafRef.current = null;
+      computeActiveGraph();
+    });
+  }, [computeActiveGraph]);
+
+  useEffect(() => {
+    computeActiveGraph();
+  }, [computeActiveGraph]);
+
+  const cardSizes = (featured: boolean, idxInGroup: number) => {
+    if (featured) return "py-7 px-5"; // maior e mais “hero”
+    if (idxInGroup === 0) return "py-5 px-4";
+    if (idxInGroup <= 2) return "py-4 px-4";
+    return "py-3 px-3";
   };
 
   const renderCard = (b: Bubble & { category: string }, idx: number, group: "hot" | "cool" | "steady") => {
     const accent = stateAccent(b.state);
-    const isMain = group === "hot" && idx === 0;
     const likedState = liked[b.id];
+
+    const isFeatured = activeGraphId === b.id;
 
     return (
       <div
         key={`${group}-${b.id}`}
+        ref={(el) => {
+          cardElsRef.current[b.id] = el;
+        }}
+        data-cardid={b.id}
         className={[
           "w-full text-left rounded-2xl border shadow-sm",
           "flex flex-col gap-3",
@@ -267,7 +357,8 @@ export default function BubbleBoard() {
           "transition",
           accent.bg,
           accent.border,
-          cardSizes(idx),
+          isFeatured ? "shadow-md ring-2 ring-orange-200" : "",
+          cardSizes(isFeatured, idx),
         ].join(" ")}
         onClick={() => setSelected(asDetail(b))}
       >
@@ -280,6 +371,7 @@ export default function BubbleBoard() {
           >
             {b.category}
           </span>
+
           <div className="flex items-center gap-2">
             <span
               className={[
@@ -293,6 +385,7 @@ export default function BubbleBoard() {
             >
               {stateLabel(b.state)}
             </span>
+
             <button
               type="button"
               onClick={(e) => {
@@ -309,20 +402,24 @@ export default function BubbleBoard() {
           </div>
         </div>
 
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1">
-            <p className={isMain ? "text-xl font-semibold text-slate-900 leading-tight" : "text-base font-semibold text-slate-900 leading-tight"}>
-              {b.label}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">Toque para ver detalhes</p>
-          </div>
-          <div className="shrink-0 text-right text-xs text-slate-500">
-            <div className="font-semibold text-slate-700">{(b.energy * 100).toFixed(0)} pts</div>
-            <div>intensidade</div>
-          </div>
+        {/* Cabeçalho do assunto (mais forte quando featured) */}
+        <div className="flex flex-col gap-1">
+          <p
+            className={[
+              isFeatured
+                ? "text-2xl md:text-3xl font-semibold text-slate-900 leading-tight"
+                : "text-base font-semibold text-slate-900 leading-tight",
+            ].join(" ")}
+          >
+            {b.label}
+          </p>
+          <p className={isFeatured ? "text-sm text-slate-600" : "text-sm text-slate-500"}>
+            Toque para ver detalhes
+          </p>
         </div>
 
-        {isMain && (
+        {/* Gráfico: agora “promove” conforme scroll (um por vez) e ocupa o card */}
+        {isFeatured && (
           <div className="mt-1 w-full">
             <Sparkline
               id={b.id}
@@ -334,11 +431,6 @@ export default function BubbleBoard() {
       </div>
     );
   };
-
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const onScroll = useCallback(() => {
-    scrollRef.current?.scrollTop;
-  }, []);
 
   return (
     <>
