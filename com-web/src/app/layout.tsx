@@ -26,7 +26,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {/* Backdrop global padrão (mesma lógica do TopicModal: bg-black/40, mas mais leve) */}
-        <div className="fixed inset-0 -z-10 bg-black/15" aria-hidden="true" />
+        <div className="fixed inset-0 -z-10 bg-black/35" aria-hidden="true" />
         {children}
       </body>
     </html>
