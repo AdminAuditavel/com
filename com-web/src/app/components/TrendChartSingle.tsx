@@ -52,6 +52,7 @@ export default function TrendChartSingle({
   height = 160,
   now = new Date(),
   showXAxis = true,
+  compact = false,
 }: {
   name: string;
   direction: "up" | "down";
@@ -61,8 +62,9 @@ export default function TrendChartSingle({
   height?: number;
   now?: Date;
   showXAxis?: boolean;
+  compact?: boolean;
 }) {
-  const pad = 12;
+  const pad = compact ? 10 : 12;
 
   const path = pointsToPath(points, width, height, pad);
   const lastV = points[points.length - 1]?.v ?? 0.5;
@@ -88,9 +90,8 @@ export default function TrendChartSingle({
   cardY = Math.max(minY, Math.min(maxY, cardY));
 
   return (
-    <div className="w-full rounded-xl bg-white/70 px-2 py-2">
+    <div className={["w-full rounded-xl bg-white/70", compact ? "px-2 py-1" : "px-2 py-2"].join(" ")}>
       <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-        {/* grid */}
         <g opacity="0.75">
           {[0.2, 0.5, 0.8].map((v) => {
             const y = yAt(v, height, pad);
@@ -98,11 +99,9 @@ export default function TrendChartSingle({
           })}
         </g>
 
-        {/* linha */}
         <path d={path} fill="none" stroke={color} strokeWidth="2.4" />
         <circle cx={endX} cy={endY} r="3.8" fill={color} />
 
-        {/* label */}
         <g transform={`translate(${cardX}, ${cardY})`}>
           <rect x={0} y={0} width={cardW} height={cardH} rx={12} fill="rgba(255,255,255,0.92)" />
           <text x={12} y={17} fontSize="11" fill="#374151">
@@ -114,7 +113,6 @@ export default function TrendChartSingle({
           </text>
         </g>
 
-        {/* eixo X (opcional) */}
         {showXAxis && (
           <g fill="#6b7280" fontSize="10">
             <text x={xAt(0, width, pad)} y={height - 2}>
