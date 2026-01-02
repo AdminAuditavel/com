@@ -288,18 +288,15 @@ function WaveBars({ id, state, energy }: { id: string; state: Bubble["state"]; e
           ))}
         </div>
 
-        <div className="relative z-10 flex items-center justify-between text-[11px] text-slate-600">
-            <span>
-              Evidência:{" "}
-              <span className="font-semibold text-slate-900">
-                {v >= 0.72 ? "Alta" : v >= 0.45 ? "Média" : "Baixa"}
-              </span>
+       <div className="relative z-10 flex items-center justify-start text-[11px] text-slate-600">
+          <span>
+            Evidência:{" "}
+            <span className="font-semibold text-slate-900">
+              {v >= 0.72 ? "Alta" : v >= 0.45 ? "Média" : "Baixa"}
             </span>
-            <span className="text-slate-500">
-              {state === "hot" ? "ganhando força" : state === "cool" ? "perdendo força" : "estável"}
-            </span>
-          </div>
+          </span>
         </div>
+      </div>
 
       <style jsx>{`
         .wavebar {
