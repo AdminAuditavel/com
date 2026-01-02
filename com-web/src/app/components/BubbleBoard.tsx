@@ -206,7 +206,6 @@ export default function BubbleBoard() {
   const CHANGE_MS = 10_000;
   const [tick, setTick] = useState(0);
 
-  // ordem estável por categoria (evita reiniciar STEP)
   const orderRef = useRef(
     INITIAL_DATA.map((cat) => ({
       title: cat.title,
@@ -280,7 +279,6 @@ export default function BubbleBoard() {
     return { hot: byEnergyDesc(hot), cool: byEnergyDesc(cool), steady: byEnergyDesc(steady) };
   }, [filtered]);
 
-  // lista “flat” renderizada
   const flatList = useMemo(() => {
     const out: (Bubble & { category: string; group: "hot" | "cool" | "steady" })[] = [];
     grouped.hot.forEach((b) => out.push({ ...b, group: "hot" }));
@@ -303,7 +301,6 @@ export default function BubbleBoard() {
   const cardElsRef = useRef<Record<string, HTMLDivElement | null>>({});
   const rafRef = useRef<number | null>(null);
 
-  // altura real do sticky + spacer dinâmico
   const [stickyH, setStickyH] = useState<number>(280);
 
   useEffect(() => {
@@ -312,17 +309,14 @@ export default function BubbleBoard() {
 
   useEffect(() => {
     if (!stickyRef.current) return;
-
     const el = stickyRef.current;
     const ro = new ResizeObserver(() => {
       const h = el.getBoundingClientRect().height;
       if (h > 0) setStickyH(h);
     });
     ro.observe(el);
-
     const h0 = el.getBoundingClientRect().height;
     if (h0 > 0) setStickyH(h0);
-
     return () => ro.disconnect();
   }, []);
 
@@ -332,7 +326,6 @@ export default function BubbleBoard() {
 
     const { scrollTop } = sc;
     const targetY = scrollTop + stickyH + 16;
-    const TOL = 10;
 
     let bestId: string | null = null;
     let bestDelta = Number.POSITIVE_INFINITY;
@@ -340,17 +333,15 @@ export default function BubbleBoard() {
     for (const item of flatList) {
       const el = cardElsRef.current[item.id];
       if (!el) continue;
-
-      const top = el.offsetTop; // relativo ao scroll container
-      const delta = top - targetY;
-
-      if (delta >= -TOL && delta < bestDelta) {
+      const top = el.offsetTop;
+      const mid = top + el.offsetHeight / 2;
+      const delta = Math.abs(mid - targetY);
+      if (delta < bestDelta) {
         bestDelta = delta;
         bestId = item.id;
       }
     }
 
-    // fallback: se nada cruzou a linha, assume último
     if (!bestId && flatList.length > 0) {
       bestId = flatList[flatList.length - 1].id;
     }
@@ -377,14 +368,11 @@ export default function BubbleBoard() {
 
   const featured = featuredId ? byId.get(featuredId) ?? null : null;
 
-  // helper para abrir modal garantindo visibilidade
   const openTopic = useCallback((b: Bubble & { category: string }) => {
-    // sobe o container para não empurrar o modal para baixo
     listRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     setSelected(asDetail(b));
   }, []);
 
-  // bloqueia scroll do body enquanto modal aberto (melhora UX)
   useEffect(() => {
     if (!selected) return;
     const prev = document.body.style.overflow;
@@ -394,7 +382,6 @@ export default function BubbleBoard() {
     };
   }, [selected]);
 
-  // ===== UI helpers =====
   const cardChrome = (b: Bubble) => {
     const accent = stateAccent(b.state);
     return [
@@ -408,7 +395,6 @@ export default function BubbleBoard() {
 
   const renderFeaturedCard = (b: Bubble & { category: string }) => {
     const likedState = liked[b.id];
-
     return (
       <div
         className={[cardChrome(b), "shadow-md ring-2 ring-orange-200", "py-7 px-5"].join(" ")}
@@ -460,8 +446,7 @@ export default function BubbleBoard() {
             <p className="text-2xl md:text-3xl font-semibold text-slate-900 leading-tight">{b.label}</p>
             <p className="text-sm text-slate-600">Toque para ver detalhes</p>
           </div>
-
-        <TrendInline spark={b.spark ?? (b.state === "cool" ? -0.06 : 0.06)} />
+          <TrendInline spark={b.spark ?? (b.state === "cool" ? -0.06 : 0.06)} />
         </div>
 
         <div className="w-full">
@@ -475,7 +460,6 @@ export default function BubbleBoard() {
 
   const renderListCard = (b: Bubble & { category: string; group: string }, idx: number) => {
     const likedState = liked[b.id];
-
     return (
       <div
         key={`${b.group}-${b.id}`}
@@ -534,15 +518,13 @@ export default function BubbleBoard() {
     );
   };
 
-  // (valor usado só para “folga” adicional no topo)
+  // folgas para não esconder lista sob sticky e permitir respiro no fim
   const spacerTopH = Math.max(280, stickyH + 160);
-  // (folga inferior para permitir penúltimo/último cruzarem a linha)
   const spacerBottomH = stickyH + 220;
 
   return (
     <>
       <div className="w-full bg-slate-50 min-h-screen">
-        {/* Search sticky */}
         <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur px-4 pt-4 pb-2 border-b border-slate-200">
           <input
             value={search}
@@ -553,30 +535,23 @@ export default function BubbleBoard() {
         </div>
 
         <div className="mx-auto w-full max-w-3xl px-4 pt-4">
-          {/* Featured sticky (card principal fixo) */}
           <div ref={stickyRef} className="sticky top-[78px] z-20">
             {featured ? renderFeaturedCard(featured) : null}
           </div>
 
-          {/* Lista com scroll */}
           <div
             ref={listRef}
             onScroll={onScroll}
             className="flex flex-col gap-4 pb-12 overflow-y-auto"
             style={{ height: "calc(100vh - 78px)" }}
           >
-            {/* Spacer dinâmico para a lista não ficar escondida sob o sticky */}
             <div style={{ height: spacerTopH }} />
-
             {flatList.map((b, idx) => renderListCard(b, idx))}
-
-            {/* Spacer inferior para permitir penúltimo/último virarem featured */}
             <div style={{ height: spacerBottomH }} />
           </div>
         </div>
       </div>
 
-      {/* Modal via portal para garantir visibilidade no viewport */}
       {typeof window !== "undefined" &&
         createPortal(
           <div className="fixed inset-0 z-[1200] pointer-events-none">
