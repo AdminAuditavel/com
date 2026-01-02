@@ -569,9 +569,10 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
               </span>
             )}
           
-            {/* Pill técnico só quando NÃO há badge editorial (steady) */}
-           <span className={statePill(b.state)}>{stateLabel(b.state)}</span>
-              {stateLabel(b.state)}
+            {/* Pill técnico apenas quando NÃO há badge editorial (steady) */}
+            {!badge && (
+              <span className={statePill(b.state)}>
+                {stateLabel(b.state)}
               </span>
             )}
           
