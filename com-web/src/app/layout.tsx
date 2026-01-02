@@ -25,9 +25,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {/* Backdrop global padrão (mesma lógica do TopicModal: bg-black/40, mas mais leve) */}
-        <div className="fixed inset-0 -z-10 bg-black/40" aria-hidden="true" />
-        {children}
+        {/* Backdrop global (AGORA visível): fica acima do fundo e abaixo do app */}
+        <div className="fixed inset-0 z-0 bg-black/40" aria-hidden="true" />
+
+        {/* App sempre acima do backdrop */}
+        <div className="relative z-10">{children}</div>
       </body>
     </html>
   );
