@@ -63,24 +63,36 @@ function stateAccent(s: Bubble["state"]) {
   return { bg: "bg-white", border: "border-slate-200", text: "text-slate-500" };
 }
 
-function makeTrendPoints(mode: "up" | "down") {
-  // 4 pontos (15,10,5,0 min atrás)
-  const base = mode === "up" ? 0.4 : 0.7;
-  const drift = mode === "up" ? 0.05 : -0.05;
-  const arr = [];
-  let v = base;
-  for (let i = 3; i >= 0; i--) {
-    v = clamp01(v + drift + (Math.random() * 0.08 - 0.04));
-    arr.push({ t: i * 5, v });
-  }
-  return arr.sort((a, b) => a.t - b.t);
+// deterministic pseudo-random (para evitar mismatch de hidratação)
+function hash32(str: string) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h << 5) - h + str.charCodeAt(i);
+  return h >>> 0;
+}
+function makeSeededRand(seed: number) {
+  let s = seed || 1;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 0xffffffff;
+  };
+}
+function makeTrendPointsDet(id: string, mode: "up" | "down") {
+  const rand = makeSeededRand(hash32(id + mode));
+  let v = mode === "up" ? 0.42 : 0.68;
+  const pts: { t: number; v: number }[] = [];
+  [0, 5, 10, 15].forEach((t) => {
+    const drift = mode === "up" ? 0.045 : -0.045;
+    const jitter = rand() * 0.06 - 0.03;
+    v = clamp01(v + drift + jitter);
+    pts.push({ t, v });
+  });
+  return pts;
 }
 
-function Sparkline({ mode, value }: { mode: "up" | "down"; value: number }) {
-  const pts = useMemo(() => makeTrendPoints(mode), [mode]);
+function Sparkline({ id, mode, value }: { id: string; mode: "up" | "down"; value: number }) {
+  const pts = useMemo(() => makeTrendPointsDet(id, mode), [id, mode]);
   const path = useMemo(() => {
     const maxT = 15;
-    const maxV = 1;
     const x = (t: number) => (t / maxT) * 100;
     const y = (v: number) => 100 - v * 90;
     return pts
@@ -88,35 +100,24 @@ function Sparkline({ mode, value }: { mode: "up" | "down"; value: number }) {
       .join(" ");
   }, [pts]);
 
+  const lastY = 100 - pts[pts.length - 1].v * 90;
+  const deltaPct = value ?? 0;
+
   return (
     <div className="w-full">
       <svg viewBox="0 0 100 100" className="h-20 w-full">
         <defs>
-          <linearGradient id={`grad-${mode}`} x1="0" x2="0" y1="0" y2="1">
+          <linearGradient id={`grad-${id}-${mode}`} x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor={mode === "up" ? "#fb923c" : "#38bdf8"} stopOpacity="0.7" />
             <stop offset="100%" stopColor={mode === "up" ? "#fdba74" : "#bae6fd"} stopOpacity="0.1" />
           </linearGradient>
         </defs>
         <path d={path} fill="none" stroke={mode === "up" ? "#f97316" : "#0ea5e9"} strokeWidth={2.4} />
-        <circle
-          r={3.6}
-          fill={mode === "up" ? "#f97316" : "#0ea5e9"}
-          cx="100"
-          cy={100 - pts[pts.length - 1].v * 90}
-        />
-        <text
-          x="100"
-          y={100 - pts[pts.length - 1].v * 90 - 4}
-          textAnchor="end"
-          className="text-[9px] fill-slate-700"
-        >
-          {value > 0 ? `+${Math.round(value * 100)}%` : `${Math.round(value * 100)}%`}
+        <circle r={3.6} fill={mode === "up" ? "#f97316" : "#0ea5e9"} cx="100" cy={lastY} />
+        <text x="100" y={lastY - 4} textAnchor="end" className="text-[9px] fill-slate-700">
+          {deltaPct > 0 ? `+${Math.round(deltaPct * 100)}%` : `${Math.round(deltaPct * 100)}%`}
         </text>
-        <polyline
-          points={`0,100 100,100 100,${100 - pts[pts.length - 1].v * 90}`}
-          fill={`url(#grad-${mode})`}
-          opacity="0.18"
-        />
+        <polyline points={`0,100 100,100 100,${lastY}`} fill={`url(#grad-${id}-${mode})`} opacity="0.18" />
       </svg>
       <div className="flex justify-between text-[10px] text-slate-500 mt-1">
         <span>−15 min</span>
@@ -212,9 +213,9 @@ export default function BubbleBoard() {
   }, [filtered]);
 
   const cardSizes = (idx: number) => {
-    if (idx === 0) return "py-5 px-4 text-base"; // maior
-    if (idx <= 2) return "py-4 px-4 text-sm"; // médio
-    return "py-3 px-3 text-sm"; // menor
+    if (idx === 0) return "py-5 px-4 text-base";
+    if (idx <= 2) return "py-4 px-4 text-sm";
+    return "py-3 px-3 text-sm";
   };
 
   const renderCard = (b: Bubble & { category: string }, idx: number, group: "hot" | "cool" | "steady") => {
@@ -289,7 +290,11 @@ export default function BubbleBoard() {
 
         {isMain && (
           <div className="mt-1">
-            <Sparkline mode={b.state === "cool" ? "down" : "up"} value={b.spark ?? (b.state === "cool" ? -0.15 : 0.2)} />
+            <Sparkline
+              id={b.id}
+              mode={b.state === "cool" ? "down" : "up"}
+              value={b.spark ?? (b.state === "cool" ? -0.15 : 0.2)}
+            />
           </div>
         )}
       </motion.button>
