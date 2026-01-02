@@ -162,8 +162,8 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, [activeIndex, activeCat, hotBubble?.id, coolBubble?.id]);
 
-  const hotScale = 1.0 + 0.18 * phase;
-  const coolScale = 1.0 - 0.12 * phase;
+  const hotScale = 0.92 + 0.26 * phase;
+  const coolScale = 0.92 - 0.18 * phase;
 
   const hotSeries = useMemo(() => makeSeries("up"), [pairTick, activeIndex]);
   const coolSeries = useMemo(() => makeSeries("down"), [pairTick, activeIndex]);
