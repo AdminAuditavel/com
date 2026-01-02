@@ -297,35 +297,18 @@ export default function BubbleBoard() {
   const [featuredId, setFeaturedId] = useState<string | null>(null);
 
   const stickyRef = useRef<HTMLDivElement | null>(null);
-  const listRef = useRef<HTMLDivElement | null>(null);
   const cardElsRef = useRef<Record<string, HTMLDivElement | null>>({});
   const rafRef = useRef<number | null>(null);
-
-  const [stickyH, setStickyH] = useState<number>(280);
 
   useEffect(() => {
     setFeaturedId(flatList[0]?.id ?? null);
   }, [flatList]);
 
-  useEffect(() => {
-    if (!stickyRef.current) return;
-    const el = stickyRef.current;
-    const ro = new ResizeObserver(() => {
-      const h = el.getBoundingClientRect().height;
-      if (h > 0) setStickyH(h);
-    });
-    ro.observe(el);
-    const h0 = el.getBoundingClientRect().height;
-    if (h0 > 0) setStickyH(h0);
-    return () => ro.disconnect();
-  }, []);
-
   const computeFeatured = useCallback(() => {
-    const sc = listRef.current;
-    if (!sc) return;
+    if (!stickyRef.current) return;
 
-    const { scrollTop } = sc;
-    const targetY = scrollTop + stickyH + 16;
+    const stickyRect = stickyRef.current.getBoundingClientRect();
+    const targetY = stickyRect.bottom + 16; // linha logo abaixo do sticky
 
     let bestId: string | null = null;
     let bestDelta = Number.POSITIVE_INFINITY;
@@ -333,8 +316,8 @@ export default function BubbleBoard() {
     for (const item of flatList) {
       const el = cardElsRef.current[item.id];
       if (!el) continue;
-      const top = el.offsetTop;
-      const mid = top + el.offsetHeight / 2;
+      const rect = el.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
       const delta = Math.abs(mid - targetY);
       if (delta < bestDelta) {
         bestDelta = delta;
@@ -349,27 +332,29 @@ export default function BubbleBoard() {
     if (bestId) {
       setFeaturedId((prev) => (prev === bestId ? prev : bestId));
     }
-  }, [flatList, stickyH]);
-
-  const onScroll = useCallback(() => {
-    if (rafRef.current) return;
-    rafRef.current = window.requestAnimationFrame(() => {
-      rafRef.current = null;
-      computeFeatured();
-    });
-  }, [computeFeatured]);
+  }, [flatList]);
 
   useEffect(() => {
     computeFeatured();
-    const onResize = () => computeFeatured();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    const onScroll = () => {
+      if (rafRef.current) return;
+      rafRef.current = window.requestAnimationFrame(() => {
+        rafRef.current = null;
+        computeFeatured();
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", computeFeatured);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", computeFeatured);
+    };
   }, [computeFeatured]);
 
   const featured = featuredId ? byId.get(featuredId) ?? null : null;
 
   const openTopic = useCallback((b: Bubble & { category: string }) => {
-    listRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
     setSelected(asDetail(b));
   }, []);
 
@@ -518,13 +503,10 @@ export default function BubbleBoard() {
     );
   };
 
-  // folgas para não esconder lista sob sticky e permitir respiro no fim
-  const spacerTopH = Math.max(280, stickyH + 160);
-  const spacerBottomH = stickyH + 220;
-
   return (
     <>
       <div className="w-full bg-slate-50 min-h-screen">
+        {/* Search sticky */}
         <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur px-4 pt-4 pb-2 border-b border-slate-200">
           <input
             value={search}
@@ -535,23 +517,23 @@ export default function BubbleBoard() {
         </div>
 
         <div className="mx-auto w-full max-w-3xl px-4 pt-4">
+          {/* Featured sticky (card principal fixo) */}
           <div ref={stickyRef} className="sticky top-[78px] z-20">
             {featured ? renderFeaturedCard(featured) : null}
           </div>
 
-          <div
-            ref={listRef}
-            onScroll={onScroll}
-            className="flex flex-col gap-4 pb-12 overflow-y-auto"
-            style={{ height: "calc(100vh - 78px)" }}
-          >
-            <div style={{ height: spacerTopH }} />
+          {/* Lista sem scroll interno, usa scroll da janela */}
+          <div className="flex flex-col gap-4 pb-24">
+            {/* pequeno espaçador superior */}
+            <div style={{ height: 40 }} />
             {flatList.map((b, idx) => renderListCard(b, idx))}
-            <div style={{ height: spacerBottomH }} />
+            {/* espaçador inferior para permitir cruzar o alvo */}
+            <div style={{ height: 320 }} />
           </div>
         </div>
       </div>
 
+      {/* Modal via portal para garantir visibilidade no viewport */}
       {typeof window !== "undefined" &&
         createPortal(
           <div className="fixed inset-0 z-[1200] pointer-events-none">
