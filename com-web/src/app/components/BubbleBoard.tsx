@@ -324,7 +324,7 @@ export default function BubbleBoard() {
     if (!stickyRef.current) return;
 
     const stickyRect = stickyRef.current.getBoundingClientRect();
-    const targetY = stickyRect.bottom + 2; // linha logo abaixo do sticky
+    const targetY = stickyRect.bottom + 2;
 
     let bestId: string | null = null;
     let bestDelta = Number.POSITIVE_INFINITY;
@@ -546,14 +546,12 @@ export default function BubbleBoard() {
 
           {/* Lista sem scroll interno, usa scroll da janela */}
           <div className="flex flex-col gap-4 pb-24">
-            {flatList.map((b) => renderListCard(b, b.id === flatList[0]?.id ? 0 : 1))}
-            {/* espaçador inferior para permitir cruzar o alvo */}
+            {flatList.map((b) => renderListCard(b))}
             <div style={{ height: 320 }} />
           </div>
         </div>
       </div>
 
-      {/* Modal via portal para garantir visibilidade no viewport */}
       {typeof window !== "undefined" &&
         createPortal(
           <div className="fixed inset-0 z-[1200] pointer-events-none">
