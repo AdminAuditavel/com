@@ -555,6 +555,7 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
           <span className={categoryPill(b.category)}>{b.category}</span>
         
           <div className="flex items-center gap-2">
+            {/* Badge editorial (hot / cool) */}
             {badge && (
               <span
                 className={[
@@ -567,7 +568,14 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
                 {badge.text}
               </span>
             )}
-        
+          
+            {/* Pill técnico só quando NÃO há badge editorial (steady) */}
+            {!badge && (
+              <span className={statePill(b.state)}>
+                {stateLabel(b.state)}
+              </span>
+            )}
+          
             <button
               type="button"
               onClick={(e) => {
