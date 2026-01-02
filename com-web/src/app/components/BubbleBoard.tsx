@@ -288,23 +288,12 @@ function WaveBars({ id, state, energy }: { id: string; state: Bubble["state"]; e
           ))}
         </div>
 
-        <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-          <div
-            className={[
-              "rounded-full px-4 py-1.5",
-              "text-[12px] font-semibold tracking-tight",
-              "bg-white/80 backdrop-blur",
-              "border border-slate-200/60",
-              "shadow-sm",
-              state === "hot"
-                ? "text-orange-700"
-                : state === "cool"
-                ? "text-sky-700"
-                : "text-slate-700",
-            ].join(" ")}
-          >
-            {state === "hot" ? "ganhando força" : state === "cool" ? "perdendo força" : "estável"}
-          </div>
+        <div className="relative z-10 flex items-center justify-between text-[11px] text-slate-600">
+          <span>
+            Evidência:{" "}
+            <span className="font-semibold text-slate-900">
+              {v >= 0.72 ? "Alta" : v >= 0.45 ? "Média" : "Baixa"}
+            </span>
         </div>
       </div>
 
