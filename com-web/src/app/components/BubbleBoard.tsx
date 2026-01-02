@@ -570,9 +570,8 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
             )}
           
             {/* Pill técnico só quando NÃO há badge editorial (steady) */}
-            {!badge && (
-              <span className={statePill(b.state)}>
-                {stateLabel(b.state)}
+           <span className={statePill(b.state)}>{stateLabel(b.state)}</span>
+              {stateLabel(b.state)}
               </span>
             )}
           
@@ -623,9 +622,8 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
 
           <div className="flex items-center gap-2">
             {/* pill técnico só aparece se NÃO houver badge editorial */}
-            {!badge && (
-              <span className={statePill(b.state)}>
-                {stateLabel(b.state)}
+            <span className={statePill(b.state)}>{stateLabel(b.state)}</span>
+              {stateLabel(b.state)}
               </span>
             )}
           
