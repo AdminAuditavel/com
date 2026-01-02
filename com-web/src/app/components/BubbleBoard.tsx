@@ -326,19 +326,45 @@ export default function BubbleBoard() {
   const computeFeatured = useCallback(() => {
     const sc = scrollRef.current;
     if (!sc) return;
-
-    const top = sc.scrollTop;
-    const threshold = 16;
-
+  
+    const scRect = sc.getBoundingClientRect();
+    const threshold = 12; // margem de tolerância
+  
+    let bestId: string | null = null;
+    let bestTop = Number.POSITIVE_INFINITY;
+  
     for (const id of renderOrderIds) {
       const el = cardElsRef.current[id];
       if (!el) continue;
-
-      const y = el.offsetTop;
-      if (y + el.offsetHeight >= top + threshold) {
-        setActiveFeaturedId((prev) => (prev === id ? prev : id));
-        return;
+  
+      const r = el.getBoundingClientRect();
+  
+      // posição do card relativa ao topo do container scrollável
+      const top = r.top - scRect.top;
+      const bottom = r.bottom - scRect.top;
+  
+      // ignorar cards totalmente fora do viewport do container
+      if (bottom <= 0) continue;
+      if (top >= scRect.height) continue;
+  
+      // queremos o mais próximo do topo (inclusive levemente acima, dentro do threshold)
+      const effectiveTop = top < 0 ? Math.abs(top) + 10_000 : top; 
+      // Observação: penaliza cards acima do topo para priorizar o primeiro visível “de verdade”
+  
+      if (effectiveTop < bestTop && top <= threshold) {
+        bestTop = effectiveTop;
+        bestId = id;
       }
+  
+      // fallback: se nenhum passou por top<=threshold, pega o primeiro que está visível
+      if (!bestId && top >= 0 && top < bestTop) {
+        bestTop = top;
+        bestId = id;
+      }
+    }
+  
+    if (bestId) {
+      setActiveFeaturedId((prev) => (prev === bestId ? prev : bestId));
     }
   }, [renderOrderIds]);
 
