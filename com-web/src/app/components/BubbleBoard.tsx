@@ -47,14 +47,14 @@ function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
-function sizeClasses(size: Bubble["size"]) {
-  if (size === "lg") return "w-32 h-32 text-base";
-  if (size === "md") return "w-24 h-24 text-sm";
-  return "w-20 h-20 text-xs";
-}
-
 function asDetail(b: Bubble): TopicDetail {
   return { id: b.id, label: b.label, state: b.state };
+}
+
+function stateLabel(s: Bubble["state"]) {
+  if (s === "hot") return "Aquecendo";
+  if (s === "cool") return "Esfriando";
+  return "Estável";
 }
 
 function makeSeries(mode: "up" | "down") {
@@ -67,6 +67,77 @@ function makeSeries(mode: "up" | "down") {
     pts.push({ t: i, v });
   }
   return pts;
+}
+
+function MessageIcon({ hot }: { hot?: boolean }) {
+  // ícone simples de balão de fala
+  return (
+    <svg
+      aria-hidden="true"
+      className={hot ? "text-orange-600" : "text-slate-500"}
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M7 17v3l3-3h7a4 4 0 0 0 4-4V7a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v6a4 4 0 0 0 4 4z" />
+    </svg>
+  );
+}
+
+type TopicCardProps = {
+  bubble: Bubble & { category: string };
+  onClick: () => void;
+  size?: "lg" | "sm";
+  emphasize?: "hot" | "cool" | "steady";
+};
+
+function TopicCard({ bubble, onClick, size = "sm", emphasize }: TopicCardProps) {
+  const state = emphasize ?? bubble.state;
+  const isHot = state === "hot";
+  const isCool = state === "cool";
+
+  const base =
+    "flex flex-col justify-between rounded-2xl border shadow-sm transition hover:-translate-y-[1px] hover:shadow-md active:translate-y-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400";
+  const sizing = size === "lg" ? "w-28 h-28 p-3" : "w-24 h-24 p-2.5";
+  const palette =
+    state === "hot"
+      ? "bg-orange-50 border-orange-200"
+      : state === "cool"
+      ? "bg-sky-50 border-sky-200"
+      : "bg-white border-slate-200";
+
+  return (
+    <button type="button" onClick={onClick} className={`${base} ${sizing} ${palette}`}>
+      <div className="flex items-center justify-between gap-1">
+        <span
+          className={[
+            "rounded-full px-2 py-[3px] text-[10px] font-semibold tracking-wide",
+            bubble.category === "ESPORTES" ? "bg-emerald-100 text-emerald-700" : "bg-indigo-100 text-indigo-700",
+          ].join(" ")}
+        >
+          {bubble.category}
+        </span>
+        <MessageIcon hot={isHot} />
+      </div>
+
+      <div className="flex flex-col items-start gap-1">
+        <span className="text-[12px] font-semibold leading-tight text-slate-900">{bubble.label}</span>
+        <span
+          className={[
+            "text-[11px] font-medium",
+            isHot ? "text-orange-700" : isCool ? "text-sky-700" : "text-slate-500",
+          ].join(" ")}
+        >
+          {stateLabel(state)}
+        </span>
+      </div>
+    </button>
+  );
 }
 
 export default function BubbleBoard() {
@@ -128,6 +199,7 @@ export default function BubbleBoard() {
     const items = activeCat?.items ?? [];
     if (items.length < 2) return { hotBubble: items[0], coolBubble: items[1] };
 
+    // mantém rotação, mas exibiremos ordenado abaixo
     return {
       hotBubble: items[pairTick % items.length],
       coolBubble: items[(pairTick + 1) % items.length],
@@ -160,9 +232,9 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, [activeIndex, activeCat, hotBubble?.id, coolBubble?.id]);
 
-  // quente cresce, fria diminui (contraste)
-  const hotScale = 0.72 + 0.68 * phase; // 0.72 -> 1.40
-  const coolScale = 1.32 - 0.56 * phase; // 1.32 -> 0.76
+  // hot ganha glow, cool reduz glow — não usamos mais escala de bolha
+  const hotGlow = 0.25 + 0.35 * phase; // para gradiente animado
+  const coolGlow = 0.35 - 0.2 * phase;
 
   const hotSeries = useMemo(() => makeSeries("up"), [pairTick, activeIndex]);
   const coolSeries = useMemo(() => makeSeries("down"), [pairTick, activeIndex]);
@@ -170,38 +242,66 @@ export default function BubbleBoard() {
   const getHotRect = useCallback(() => hotRef.current?.getBoundingClientRect() ?? null, []);
   const getCoolRect = useCallback(() => coolRef.current?.getBoundingClientRect() ?? null, []);
 
+  // enriquece com categoria e ordena por energia para lista
+  const itemsWithCategory = (cat: CategoryBlock | undefined) =>
+    (cat?.items ?? []).map((b) => ({ ...b, category: cat?.title ?? "" }));
+
+  const sortedItems = useMemo(() => {
+    const items = itemsWithCategory(activeCat);
+    return [...items].sort((a, b) => b.energy - a.energy);
+  }, [activeCat]);
+
   return (
     <>
-      <BubbleParticles active={!!hotBubble} mode="in" colorVar="var(--hot-br)" getSourceRect={getHotRect} intensity={16} />
-      <BubbleParticles active={!!coolBubble} mode="out" colorVar="var(--cool-br)" getSourceRect={getCoolRect} intensity={14} />
+      <BubbleParticles
+        active={!!hotBubble}
+        mode="in"
+        colorVar="var(--hot-br)"
+        getSourceRect={getHotRect}
+        intensity={14}
+      />
+      <BubbleParticles
+        active={!!coolBubble}
+        mode="out"
+        colorVar="var(--cool-br)"
+        getSourceRect={getCoolRect}
+        intensity={12}
+      />
 
-      {/* Menu/tabs agora em "glass" (deixa o backdrop aparecer) */}
-      <div className="sticky top-0 z-50 border-b border-white/25 bg-white/35 backdrop-blur-md">
+      {/* Header/tabs em fundo claro */}
+      <div className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur-sm">
         <div className="px-5 py-3">
-          <div className="flex gap-2">
-            {data.map((cat, idx) => {
-              const active = idx === activeIndex;
-              return (
-                <button
-                  key={cat.title}
-                  type="button"
-                  onClick={() => {
-                    goTo(idx);
-                    setPairTick(0);
-                  }}
-                  className={[
-                    "px-3 py-2 rounded-full text-xs font-semibold tracking-widest",
-                    "transition border shadow-sm",
-                    active
-                      ? "bg-gray-900/90 text-white border-gray-900/60"
-                      : "bg-white/35 text-gray-700 border-white/35",
-                  ].join(" ")}
-                  aria-current={active ? "page" : undefined}
-                >
-                  {cat.title}
-                </button>
-              );
-            })}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-semibold tracking-[0.22em] text-slate-500">
+                PULSO DO DEBATE
+              </p>
+              <p className="text-sm text-slate-600">O que está bombando agora</p>
+            </div>
+            <div className="flex gap-2">
+              {data.map((cat, idx) => {
+                const active = idx === activeIndex;
+                return (
+                  <button
+                    key={cat.title}
+                    type="button"
+                    onClick={() => {
+                      goTo(idx);
+                      setPairTick(0);
+                    }}
+                    className={[
+                      "px-3 py-2 rounded-full text-[11px] font-semibold tracking-widest transition border shadow-sm",
+                      active
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white text-slate-700 border-slate-200",
+                    ].join(" ")}
+                    aria-current={active ? "page" : undefined}
+                  >
+                    {cat.title}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -209,12 +309,7 @@ export default function BubbleBoard() {
       <div
         ref={viewportRef}
         onScroll={onScroll}
-        className={[
-          "w-full overflow-x-auto",
-          "snap-x snap-mandatory",
-          "scroll-smooth",
-          "[scrollbar-width:none] [-ms-overflow-style:none]",
-        ].join(" ")}
+        className="w-full overflow-x-auto snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none]"
         style={{ WebkitOverflowScrolling: "touch" }}
       >
         <style jsx>{`
@@ -223,9 +318,9 @@ export default function BubbleBoard() {
           }
         `}</style>
 
-        <div className="flex w-full">
+        <div className="flex w-full bg-slate-50">
           {data.map((cat) => {
-            const items = cat.items;
+            const items = itemsWithCategory(cat);
             const isActive = cat.title === activeCat?.title;
 
             const hot = isActive ? hotBubble : items[0];
@@ -237,59 +332,63 @@ export default function BubbleBoard() {
                 className="w-full flex-none snap-center px-5 pb-8"
                 style={{ minHeight: "calc(100dvh - 72px)" }}
               >
-                <div className="pt-7 flex flex-col gap-5">
-                  <div className="flex justify-center gap-10">
-                    <button
-                      ref={isActive ? hotRef : undefined}
-                      type="button"
-                      onClick={() => hot && setSelected(asDetail(hot))}
-                      className="bubble bubble-hot rounded-full border overflow-hidden flex flex-col items-center justify-center w-24 h-24 transition-transform duration-300 will-change-transform"
-                      style={{ ["--e" as any]: hot?.energy ?? 0.6, transform: `scale(${hotScale})` }}
+                <div className="pt-6 flex flex-col gap-5">
+                  <div className="flex justify-center gap-3">
+                    <div
+                      className="relative"
+                      style={{
+                        filter: `drop-shadow(0 10px 28px rgba(255,119,29,${hotGlow.toFixed(2)}))`,
+                      }}
                     >
-                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">{hot?.label ?? "—"}</div>
-                      <div className="text-[10px] text-gray-700/80 mt-1">Aquecendo</div>
-                    </button>
+                      <div ref={isActive ? hotRef : undefined}>
+                        {hot ? (
+                          <TopicCard
+                            bubble={{ ...(hot as Bubble), category: cat.title }}
+                            onClick={() => setSelected(asDetail(hot as Bubble))}
+                            size="lg"
+                            emphasize="hot"
+                          />
+                        ) : null}
+                      </div>
+                    </div>
 
-                    <button
-                      ref={isActive ? coolRef : undefined}
-                      type="button"
-                      onClick={() => cool && setSelected(asDetail(cool))}
-                      className="bubble bubble-cool rounded-full border overflow-hidden flex flex-col items-center justify-center w-24 h-24 transition-transform duration-300 will-change-transform"
-                      style={{ ["--e" as any]: cool?.energy ?? 0.4, transform: `scale(${coolScale})` }}
+                    <div
+                      className="relative"
+                      style={{
+                        filter: `drop-shadow(0 10px 24px rgba(56,189,248,${coolGlow.toFixed(2)}))`,
+                      }}
                     >
-                      <div className="font-semibold text-[13px] px-2 text-center leading-tight">{cool?.label ?? "—"}</div>
-                      <div className="text-[10px] text-gray-700/80 mt-1">Esfriando</div>
-                    </button>
+                      <div ref={isActive ? coolRef : undefined}>
+                        {cool ? (
+                          <TopicCard
+                            bubble={{ ...(cool as Bubble), category: cat.title }}
+                            onClick={() => setSelected(asDetail(cool as Bubble))}
+                            size="lg"
+                            emphasize="cool"
+                          />
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Gráfico: TrendChartsStack já é "card"; vamos fazer ele glass também (ver arquivo abaixo) */}
                   <TrendChartsStack
                     now={new Date()}
                     hot={{ name: hot?.label ?? "Quente", points: hotSeries }}
                     cool={{ name: cool?.label ?? "Frio", points: coolSeries }}
                   />
 
-                  <div className="pt-1">
+                  <div className="pt-2">
                     <div className="flex flex-wrap gap-3 justify-center">
-                      {items.map((b) => (
-                        <button
-                          key={b.id}
-                          type="button"
-                          onClick={() => setSelected(asDetail(b))}
-                          className={[
-                            "bubble rounded-full border overflow-hidden flex flex-col items-center justify-center",
-                            b.state === "hot" && "bubble-hot",
-                            b.state === "cool" && "bubble-cool",
-                            b.state === "steady" && "bubble-steady",
-                            sizeClasses("sm"),
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
-                          style={{ ["--e" as any]: b.energy }}
-                        >
-                          <div className="text-[11px] font-medium px-2 text-center leading-tight">{b.label}</div>
-                        </button>
-                      ))}
+                      {items
+                        .sort((a, b) => b.energy - a.energy)
+                        .map((b) => (
+                          <TopicCard
+                            key={b.id}
+                            bubble={b}
+                            onClick={() => setSelected(asDetail(b))}
+                            size="sm"
+                          />
+                        ))}
                     </div>
                   </div>
                 </div>
