@@ -492,12 +492,18 @@ export default function BubbleBoard() {
                 setLiked((prev) => ({ ...prev, [b.id]: !prev[b.id] }));
               }}
               className={[
-                "rounded-full border px-2 py-1 text-[12px] font-semibold",
-                likedState ? "bg-rose-500 border-rose-500 text-white" : "bg-white border-slate-200 text-slate-600",
+                "inline-flex items-center justify-center",
+                "w-9 h-9",                 // tamanho do botão
+                "rounded-full border",
+                "text-[18px] leading-none", // coração maior e bem centralizado
+                "transition-colors",
+                likedState
+                  ? "bg-rose-500 border-rose-500 text-white"
+                  : "bg-transparent border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-700",
               ].join(" ")}
-              aria-label="Curtir"
+              aria-label={likedState ? "Descurtir" : "Curtir"}
             >
-              ♥
+              {likedState ? "♥" : "♡"}
             </button>
           </div>
         </div>
