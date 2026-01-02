@@ -70,7 +70,7 @@ function formatDeltaPct(v?: number) {
   return `${pct}%`;
 }
 
-function TrendInline({ spark }: { spark?: number }) {
+function TrendInline({ spark, state }: { spark?: number; state: Bubble["state"] }) {
   const pct = formatDeltaPct(spark);
   const icon =
     spark && spark > 0.5
@@ -83,9 +83,16 @@ function TrendInline({ spark }: { spark?: number }) {
       ? "↘"
       : "→";
 
+  const valueCls =
+    state === "hot"
+      ? "text-orange-700"
+      : state === "cool"
+      ? "text-sky-700"
+      : "text-slate-700";
+
   return (
     <div className="shrink-0 text-right leading-tight">
-      <div className="text-sm font-semibold text-slate-900">
+      <div className={["text-sm font-semibold", valueCls].join(" ")}>
         <span className="mr-1">{icon}</span>
         {pct}
       </div>
