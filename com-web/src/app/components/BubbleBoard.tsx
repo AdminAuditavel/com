@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import TopicModal, { type TopicDetail } from "@/app/components/TopicModal";
 
 type Bubble = {
@@ -329,10 +330,8 @@ export default function BubbleBoard() {
     const sc = listRef.current;
     if (!sc) return;
 
-    const { scrollTop, scrollHeight, clientHeight } = sc;
+    const { scrollTop } = sc;
     const targetY = scrollTop + stickyH + 16;
-    const nearBottom = scrollTop + clientHeight >= scrollHeight - 24; // tolerância para final da lista
-
     const TOL = 10;
 
     let bestId: string | null = null;
@@ -351,8 +350,8 @@ export default function BubbleBoard() {
       }
     }
 
-    // Se estamos no fim ou não achou candidato, força o último como featured
-    if ((!bestId || nearBottom) && flatList.length > 0) {
+    // fallback: se nada cruzou a linha, assume último
+    if (!bestId && flatList.length > 0) {
       bestId = flatList[flatList.length - 1].id;
     }
 
@@ -462,7 +461,7 @@ export default function BubbleBoard() {
             <p className="text-sm text-slate-600">Toque para ver detalhes</p>
           </div>
 
-          <TrendInline spark={b.spark ?? (b.state === "cool" ? -0.06 : 0.06)} />
+        <TrendInline spark={b.spark ?? (b.state === "cool" ? -0.06 : 0.06)} />
         </div>
 
         <div className="w-full">
@@ -535,8 +534,10 @@ export default function BubbleBoard() {
     );
   };
 
-  // (valor usado só para “folga” adicional)
-  const spacerH = Math.max(280, stickyH + 160);
+  // (valor usado só para “folga” adicional no topo)
+  const spacerTopH = Math.max(280, stickyH + 160);
+  // (folga inferior para permitir penúltimo/último cruzarem a linha)
+  const spacerBottomH = stickyH + 220;
 
   return (
     <>
@@ -565,19 +566,26 @@ export default function BubbleBoard() {
             style={{ height: "calc(100vh - 78px)" }}
           >
             {/* Spacer dinâmico para a lista não ficar escondida sob o sticky */}
-            <div style={{ height: spacerH }} />
+            <div style={{ height: spacerTopH }} />
 
             {flatList.map((b, idx) => renderListCard(b, idx))}
+
+            {/* Spacer inferior para permitir penúltimo/último virarem featured */}
+            <div style={{ height: spacerBottomH }} />
           </div>
         </div>
       </div>
 
-      {/* Wrapper FIXO para garantir que o modal apareça no topo da tela */}
-      <div className="fixed inset-0 z-[999] pointer-events-none">
-        <div className="pointer-events-auto">
-          <TopicModal open={!!selected} topic={selected} onClose={() => setSelected(null)} />
-        </div>
-      </div>
+      {/* Modal via portal para garantir visibilidade no viewport */}
+      {typeof window !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-[1200] pointer-events-none">
+            <div className="pointer-events-auto">
+              <TopicModal open={!!selected} topic={selected} onClose={() => setSelected(null)} />
+            </div>
+          </div>,
+          document.body
+        )}
     </>
   );
 }
