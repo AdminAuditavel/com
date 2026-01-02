@@ -1,4 +1,3 @@
-//src/app/components/BubbleBoard.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
@@ -12,7 +11,7 @@ type Bubble = {
   size: "lg" | "md" | "sm";
   energy: number; // 0..1
   spark?: number; // trend % (aqui passará a ser recent_growth)
-  evidence_score?: number; // <-- novo
+  evidence_score?: number; // novo
 };
 
 type CategoryBlock = {
@@ -56,6 +55,10 @@ const INITIAL_DATA: CategoryBlock[] = [
 
 function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
+}
+
+function clamp(n: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, n));
 }
 
 function asDetail(b: Bubble): TopicDetail {
@@ -128,27 +131,18 @@ function makeSeededRand(seed: number) {
 }
 
 /* ======================================================
-   LÓGICA DE PRODUTO (MOTOR DE EVIDÊNCIA) — NOVO
-   - recent_growth determinístico e suave por tópico
-   - state derivado de growth (não aleatório por categoria)
-   - energy com inércia
+   LÓGICA DE PRODUTO (MOTOR DE EVIDÊNCIA)
 ====================================================== */
 
 function toStateFromGrowth(g: number, prev?: Bubble["state"]): Bubble["state"] {
-  // thresholds de entrada (mais difíceis) e saída (mais fáceis)
   const HOT_IN = 0.12;
   const HOT_OUT = 0.06;
-
   const COOL_IN = -0.10;
   const COOL_OUT = -0.05;
 
-  // mantém hot até cair abaixo do HOT_OUT
   if (prev === "hot") return g >= HOT_OUT ? "hot" : "steady";
-
-  // mantém cool até subir acima do COOL_OUT
   if (prev === "cool") return g <= COOL_OUT ? "cool" : "steady";
 
-  // entrada em hot/cool é mais exigente
   if (g >= HOT_IN) return "hot";
   if (g <= COOL_IN) return "cool";
   return "steady";
@@ -163,11 +157,9 @@ function simulateGrowthDet(topicId: string, tick: number) {
   const phase = rand() * Math.PI * 2;
 
   const wave = Math.sin(tick * freq + phase) * (0.06 + rand() * 0.05); // amplitude 0.06..0.11
-
-  // choques raros e leves (picos de evidência)
   const shock = Math.sin(tick * 0.015 + phase * 0.7) > 0.92 ? 0.06 + rand() * 0.05 : 0;
 
-  return Math.max(-0.22, Math.min(0.28, base + wave + shock));
+  return clamp(base + wave + shock, -0.22, 0.28);
 }
 
 function stepEnergy(prevEnergy: number, state: Bubble["state"]) {
@@ -178,6 +170,25 @@ function stepEnergy(prevEnergy: number, state: Bubble["state"]) {
   if (state === "cool") return clamp01(e - 0.010 + (baseline - e) * 0.01);
 
   return clamp01(e + (baseline - e) * 0.03);
+}
+
+/**
+ * evidence_score (0..100)
+ * - growth (spark) pesa mais
+ * - energy pesa bastante
+ * - bônus editorial para hot/cool
+ */
+function computeEvidenceScore(energy: number, growth: number, state: Bubble["state"]) {
+  const e = clamp(energy, 0, 1);
+  const g = clamp(growth, -0.25, 0.25);
+
+  const g01 = (g + 0.25) / 0.5; // -0.25 -> 0 ; +0.25 -> 1
+  let score = (g01 * 0.60 + e * 0.40) * 100;
+
+  if (state === "hot") score += 6;
+  if (state === "cool") score -= 4;
+
+  return clamp(score, 0, 100);
 }
 
 function getEditorialBadge(b: Bubble) {
@@ -198,34 +209,6 @@ function getEditorialBadge(b: Bubble) {
   }
 
   return null;
-}
-
-function clamp(n: number, a: number, b: number) {
-  return Math.max(a, Math.min(b, n));
-}
-
-/**
- * evidence_score (0..100)
- * Intuição:
- * - growth (spark) pesa mais (produto = “agora”)
- * - energy pesa bastante (massa)
- * - bônus editorial para hot/cool (sem exagero)
- */
-function computeEvidenceScore(energy: number, growth: number, state: Bubble["state"]) {
-  const e = clamp(energy, 0, 1);
-  const g = clamp(growth, -0.25, 0.25); // corta extremos para estabilidade
-
-  // normaliza growth para 0..1 em torno de 0
-  const g01 = (g + 0.25) / 0.5; // -0.25 -> 0 ; +0.25 -> 1
-
-  // base: growth domina um pouco (A+C)
-  let score = (g01 * 0.60 + e * 0.40) * 100;
-
-  // toque editorial: hot ganha leve bônus; cool perde leve
-  if (state === "hot") score += 6;
-  if (state === "cool") score -= 4;
-
-  return clamp(score, 0, 100);
 }
 
 function WaveBars({ id, state, energy }: { id: string; state: Bubble["state"]; energy: number }) {
@@ -288,12 +271,10 @@ function WaveBars({ id, state, energy }: { id: string; state: Bubble["state"]; e
           ))}
         </div>
 
-       <div className="relative z-10 flex items-center justify-start text-[11px] text-slate-600">
+        <div className="relative z-10 flex items-center justify-start text-[11px] text-slate-600">
           <span>
             Evidência:{" "}
-            <span className="font-semibold text-slate-900">
-              {v >= 0.72 ? "Alta" : v >= 0.45 ? "Média" : "Baixa"}
-            </span>
+            <span className="font-semibold text-slate-900">{v >= 0.72 ? "Alta" : v >= 0.45 ? "Média" : "Baixa"}</span>
           </span>
         </div>
       </div>
@@ -346,11 +327,11 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
   }, []);
 
   /* ======================================================
-     ATUALIZAÇÃO — AGORA POR MOTOR DE EVIDÊNCIA (NOVO)
+     ATUALIZAÇÃO — MOTOR DE EVIDÊNCIA
      - spark = recent_growth
      - state = função do growth
      - energy = inércia por state
-====================================================== */
+  ====================================================== */
   useEffect(() => {
     const STEP_MS = 160;
 
@@ -363,7 +344,7 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
             const state = toStateFromGrowth(g, b.state);
             const nextEnergy = stepEnergy(b.energy, state);
             const score = computeEvidenceScore(nextEnergy, g, state);
-            
+
             return {
               ...b,
               spark: g,
@@ -401,9 +382,9 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
       else if (b.state === "cool") cool.push(b);
       else steady.push(b);
     });
-    const byEvidenceDesc = (arr: typeof hot) =>
-      arr.sort((a, b) => (b.evidence_score ?? 0) - (a.evidence_score ?? 0));
-    
+
+    const byEvidenceDesc = (arr: typeof hot) => arr.sort((a, b) => (b.evidence_score ?? 0) - (a.evidence_score ?? 0));
+
     return {
       hot: byEvidenceDesc(hot),
       cool: byEvidenceDesc(cool),
@@ -458,7 +439,6 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
     }
 
     if (!bestId && flatList.length > 0) bestId = flatList[flatList.length - 1].id;
-
     if (bestId) setFeaturedId((prev) => (prev === bestId ? prev : bestId));
   }, [flatList]);
 
@@ -545,37 +525,30 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
         : "bg-white/40 border-slate-200/80 text-slate-500 hover:border-slate-300 hover:text-slate-700",
     ].join(" ");
 
+  const badgePillCls = (badgeCls: string) =>
+    [
+      "inline-flex items-center rounded-full border px-2.5 py-1",
+      "text-[12px] font-semibold tracking-tight",
+      "shadow-sm",
+      badgeCls,
+    ].join(" ");
+
   const renderFeaturedCard = (b: Bubble & { category: string }) => {
     const likedState = liked[b.id];
     const badge = getEditorialBadge(b);
-    
+
     return (
       <div className={[cardChrome(b), "p-6"].join(" ")} onClick={() => openTopic(b)}>
         <div className="flex items-center justify-between gap-2">
           <span className={categoryPill(b.category)}>{b.category}</span>
-        
+
           <div className="flex items-center gap-2">
-            {/* Badge editorial (hot / cool) */}
-            {badge && (
-              <span
-                className={[
-                  "inline-flex items-center rounded-full border px-2.5 py-1",
-                  "text-[12px] font-semibold tracking-tight",
-                  "shadow-sm",
-                  badge.cls,
-                ].join(" ")}
-              >
-                {badge.text}
-              </span>
+            {badge ? (
+              <span className={badgePillCls(badge.cls)}>{badge.text}</span>
+            ) : (
+              <span className={statePill(b.state)}>{stateLabel(b.state)}</span>
             )}
-          
-            {/* Pill técnico apenas quando NÃO há badge editorial (steady) */}
-            {!badge && (
-              <span className={statePill(b.state)}>
-                {stateLabel(b.state)}
-              </span>
-            )}
-          
+
             <button
               type="button"
               onClick={(e) => {
@@ -609,6 +582,8 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
 
   const renderListCard = (b: Bubble & { category: string; group: string }) => {
     const likedState = liked[b.id];
+    const badge = getEditorialBadge(b);
+
     return (
       <div
         key={`${b.group}-${b.id}`}
@@ -622,12 +597,12 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
           <span className={categoryPill(b.category)}>{b.category}</span>
 
           <div className="flex items-center gap-2">
-            {/* pill técnico só aparece se NÃO houver badge editorial */}
-            <span className={statePill(b.state)}>{stateLabel(b.state)}</span>
-              {stateLabel(b.state)}
-              </span>
+            {badge ? (
+              <span className={badgePillCls(badge.cls)}>{badge.text}</span>
+            ) : (
+              <span className={statePill(b.state)}>{stateLabel(b.state)}</span>
             )}
-          
+
             <button
               type="button"
               onClick={(e) => {
