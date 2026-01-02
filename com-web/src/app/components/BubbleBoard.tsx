@@ -295,7 +295,6 @@ function WaveBars({ id, state, energy }: { id: string; state: Bubble["state"]; e
               {v >= 0.72 ? "Alta" : v >= 0.45 ? "Média" : "Baixa"}
             </span>
         </div>
-      </div>
 
       <style jsx>{`
         .wavebar {
