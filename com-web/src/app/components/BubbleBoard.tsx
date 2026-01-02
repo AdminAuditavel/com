@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { useSearchParams } from "next/navigation";
 import TopicModal, { type TopicDetail } from "@/app/components/TopicModal";
 
 type Bubble = {
@@ -214,10 +215,13 @@ function WaveBars({ id, state, energy }: { id: string; state: Bubble["state"]; e
 }
 
 export default function BubbleBoard() {
+  // Search comes from the Home header via querystring (?q=...)
+  const searchParams = useSearchParams();
+  const search = (searchParams.get("q") ?? "").trim();
+
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
   const [selected, setSelected] = useState<TopicDetail | null>(null);
   const [liked, setLiked] = useState<Record<string, boolean>>({});
-  const [search, setSearch] = useState("");
 
   const CHANGE_MS = 10_000;
   const [tick, setTick] = useState(0);
@@ -275,7 +279,7 @@ export default function BubbleBoard() {
   );
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.toLowerCase();
     if (!q) return itemsWithCategory;
     return itemsWithCategory.filter(
       (b) => b.label.toLowerCase().includes(q) || b.category.toLowerCase().includes(q)
@@ -341,13 +345,9 @@ export default function BubbleBoard() {
       }
     }
 
-    if (!bestId && flatList.length > 0) {
-      bestId = flatList[flatList.length - 1].id;
-    }
+    if (!bestId && flatList.length > 0) bestId = flatList[flatList.length - 1].id;
 
-    if (bestId) {
-      setFeaturedId((prev) => (prev === bestId ? prev : bestId));
-    }
+    if (bestId) setFeaturedId((prev) => (prev === bestId ? prev : bestId));
   }, [flatList]);
 
   useEffect(() => {
@@ -515,36 +515,17 @@ export default function BubbleBoard() {
 
   return (
     <>
-      <div className="w-full bg-slate-50 min-h-screen">
-        {/* Search sticky (sem título/subtítulo) */}
-        <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-xl px-4 py-3 border-b border-slate-200/60">
-          <div className="mx-auto w-full max-w-3xl">
-            <div className="relative">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                ⌕
-              </span>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar tema ou categoria..."
-                className="w-full h-11 rounded-2xl border border-slate-200/70 bg-white/70 pl-9 pr-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-              />
-            </div>
-          </div>
+      {/* IMPORTANT: BubbleBoard no longer renders its own top bar */}
+      <div className="mx-auto w-full max-w-3xl px-4 pt-4">
+        {/* Sticky featured (offset = home header height). Adjust if needed. */}
+        <div ref={stickyRef} className="sticky top-[148px] z-20">
+          {featured ? renderFeaturedCard(featured) : null}
         </div>
 
-        <div className="mx-auto w-full max-w-3xl px-4 pt-4">
-          {/* Featured sticky (card principal fixo) */}
-          <div ref={stickyRef} className="sticky top-[76px] z-20">
-            {featured ? renderFeaturedCard(featured) : null}
-          </div>
-
-          {/* Lista sem scroll interno, usa scroll da janela */}
-          <div className="flex flex-col gap-4 pb-24 pt-4">
-            {/* pt-4 cria o mesmo espaçamento do gap entre o card sticky e o 1º card */}
-            {flatList.map((b) => renderListCard(b))}
-            <div style={{ height: 320 }} />
-          </div>
+        {/* Add padding-top so first item doesn't stick to featured */}
+        <div className="flex flex-col gap-4 pb-24 pt-4">
+          {flatList.map((b) => renderListCard(b))}
+          <div style={{ height: 320 }} />
         </div>
       </div>
 
