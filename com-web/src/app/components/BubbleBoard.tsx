@@ -308,7 +308,7 @@ export default function BubbleBoard() {
     if (!stickyRef.current) return;
 
     const stickyRect = stickyRef.current.getBoundingClientRect();
-    const targetY = stickyRect.bottom + 16; // linha logo abaixo do sticky
+    const targetY = stickyRect.bottom + 8; // linha logo abaixo do sticky
 
     let bestId: string | null = null;
     let bestDelta = Number.POSITIVE_INFINITY;
