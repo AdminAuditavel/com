@@ -2,14 +2,29 @@ import BubbleBoard from "@/app/components/BubbleBoard";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-white/25 backdrop-blur-[2px] text-gray-900">
-      <header className="px-5 pt-7 pb-4">
-        <h1 className="text-center text-xl font-semibold tracking-tight">
-          O que está explodindo agora
-        </h1>
-        <p className="text-center text-xs text-gray-500 mt-1">
-          Atualizado continuamente
-        </p>
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      {/* iOS-like top bar (title + search) */}
+      <header className="sticky top-0 z-40 bg-slate-50/80 backdrop-blur-xl border-b border-slate-200/60">
+        <div className="mx-auto w-full max-w-3xl px-4 pt-4 pb-3">
+          <h1 className="text-center text-[17px] font-semibold tracking-tight">
+            O que está explodindo agora
+          </h1>
+          <p className="text-center text-[12px] text-slate-500 mt-1">
+            Atualizado continuamente
+          </p>
+
+          <div className="mt-3 relative">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              ⌕
+            </span>
+            <input
+              // BubbleBoard vai capturar via querystring (q) por enquanto
+              name="q"
+              placeholder="Buscar tema ou categoria..."
+              className="w-full h-11 rounded-2xl border border-slate-200/70 bg-white/70 pl-9 pr-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+            />
+          </div>
+        </div>
       </header>
 
       <BubbleBoard />
