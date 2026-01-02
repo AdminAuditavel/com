@@ -566,6 +566,9 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <p className="text-[26px] md:text-[30px] font-semibold text-slate-900 leading-tight">{b.label}</p>
+            <p className="mt-1 text-[13px] text-slate-600">
+              Comentaram muito sobre esse tema.
+            </p>
             <p className="text-[13px] text-slate-600">Toque para ver detalhes</p>
           </div>
           <TrendInline spark={b.spark ?? 0} state={b.state} />
