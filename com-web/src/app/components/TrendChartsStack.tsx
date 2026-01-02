@@ -35,7 +35,6 @@ function pointsToPath(points: Point[], w: number, h: number, pad: number) {
     .join(" ");
 }
 
-// “percentual” visual/impactante
 function boostedPercent(points: Point[], boost = 2.4) {
   if (points.length < 2) return 0;
   const first = clamp01(points[0]!.v);
@@ -53,6 +52,7 @@ function MiniChart({
   height,
   now,
   showXAxis,
+  pad,
 }: {
   name: string;
   direction: "up" | "down";
@@ -62,9 +62,8 @@ function MiniChart({
   height: number;
   now: Date;
   showXAxis: boolean;
+  pad: number;
 }) {
-  const pad = 12;
-
   const path = pointsToPath(points, width, height, pad);
   const lastV = points[points.length - 1]?.v ?? 0.5;
 
@@ -74,7 +73,6 @@ function MiniChart({
   const pct = boostedPercent(points, 2.4);
   const arrow = direction === "up" ? "↑" : "↓";
 
-  // label à direita dentro do mini-chart (agora não conflita com outro gráfico)
   const cardW = 150;
   const cardH = 42;
   const cardX = width - pad - cardW;
@@ -92,7 +90,6 @@ function MiniChart({
 
   return (
     <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-      {/* grid */}
       <g opacity="0.75">
         {[0.2, 0.5, 0.8].map((v) => {
           const y = yAt(v, height, pad);
@@ -100,11 +97,9 @@ function MiniChart({
         })}
       </g>
 
-      {/* line */}
       <path d={path} fill="none" stroke={color} strokeWidth="2.4" />
       <circle cx={endX} cy={endY} r="3.8" fill={color} />
 
-      {/* label */}
       <g transform={`translate(${cardX}, ${cardY})`}>
         <rect x={0} y={0} width={cardW} height={cardH} rx={12} fill="rgba(255,255,255,0.92)" />
         <text x={12} y={17} fontSize="11" fill="#374151">
@@ -116,7 +111,6 @@ function MiniChart({
         </text>
       </g>
 
-      {/* eixo X só no de baixo */}
       {showXAxis && (
         <g fill="#6b7280" fontSize="10">
           <text x={xAt(0, width, pad)} y={height - 2}>
@@ -142,8 +136,9 @@ export default function TrendChartsStack({
   cool,
   now = new Date(),
   width = 360,
-  hotHeight = 140,
-  coolHeight = 150,
+  hotHeight = 130,
+  coolHeight = 145,
+  overlapPx = 14, // <- aproxima (sobrepõe) o de baixo
 }: {
   hot: { name: string; points: Point[] };
   cool: { name: string; points: Point[] };
@@ -151,9 +146,12 @@ export default function TrendChartsStack({
   width?: number;
   hotHeight?: number;
   coolHeight?: number;
+  overlapPx?: number;
 }) {
+  const pad = 10; // menor para reduzir “ar” interno
+
   return (
-    <div className="w-full rounded-xl bg-white/70 px-2 py-2">
+    <div className="w-full rounded-xl bg-white/70 px-2 py-1">
       <div className="flex flex-col">
         <MiniChart
           name={hot.name}
@@ -164,19 +162,23 @@ export default function TrendChartsStack({
           height={hotHeight}
           now={now}
           showXAxis={false}
+          pad={pad}
         />
-        {/* divisor sutil para dar sensação de um bloco só */}
-        <div className="h-px bg-gray-200/70 mx-2 -mt-1" />
-        <MiniChart
-          name={cool.name}
-          direction="down"
-          color="var(--cool-br)"
-          points={cool.points}
-          width={width}
-          height={coolHeight}
-          now={now}
-          showXAxis={true}
-        />
+
+        {/* aproxima o segundo subindo */}
+        <div style={{ marginTop: -overlapPx }}>
+          <MiniChart
+            name={cool.name}
+            direction="down"
+            color="var(--cool-br)"
+            points={cool.points}
+            width={width}
+            height={coolHeight}
+            now={now}
+            showXAxis={true}
+            pad={pad}
+          />
+        </div>
       </div>
     </div>
   );
