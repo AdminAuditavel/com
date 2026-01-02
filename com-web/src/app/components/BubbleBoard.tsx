@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import TopicModal, { type TopicDetail } from "@/app/components/TopicModal";
-import BubbleParticles from "@/app/components/BubbleParticles";
 
 type Bubble = {
   id: string;
@@ -56,143 +55,37 @@ function stateLabel(s: Bubble["state"]) {
   return "Estável";
 }
 
-type TopicCardProps = {
-  bubble: Bubble & { category: string };
-  onClick: () => void;
-  size?: "lg" | "sm";
-  emphasize?: "hot" | "cool" | "steady";
-};
-
-function TopicCard({ bubble, onClick, size = "sm", emphasize }: TopicCardProps) {
-  const state = emphasize ?? bubble.state;
-  const isHot = state === "hot";
-  const isCool = state === "cool";
-
-  const sizing = size === "lg" ? "w-32 h-32 p-4" : "w-24 h-24 p-2.5";
-  const fillColor =
-    state === "hot"
-      ? "rgb(255 237 213)" // orange-50
-      : state === "cool"
-      ? "rgb(224 242 254)" // sky-50
-      : "white";
-  const strokeColor =
-    state === "hot"
-      ? "rgb(254 215 170)" // orange-200
-      : state === "cool"
-      ? "rgb(186 230 253)" // sky-200
-      : "rgb(226 232 240)"; // slate-200
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "relative overflow-hidden",
-        "flex flex-col justify-between",
-        "transition hover:-translate-y-[1px] hover:shadow-md active:translate-y-0",
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400",
-        sizing,
-      ].join(" ")}
-      style={{ filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.06))" }}
-    >
-      <svg
-        aria-hidden="true"
-        className="absolute inset-0 w-full h-full"
-        viewBox="0 0 24 24"
-        preserveAspectRatio="none"
-      >
-        <path
-          d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"
-          fill={fillColor}
-          stroke={strokeColor}
-          strokeWidth={1.4}
-          vectorEffect="non-scaling-stroke"
-        />
-      </svg>
-
-      <div className="relative z-10 flex items-center justify-between gap-1">
-        <span
-          className={[
-            "rounded-full px-2 py-[3px] text-[10px] font-semibold tracking-wide",
-            bubble.category === "ESPORTES" ? "bg-emerald-100 text-emerald-700" : "bg-indigo-100 text-indigo-700",
-          ].join(" ")}
-        >
-          {bubble.category}
-        </span>
-      </div>
-
-      <div className="relative z-10 flex flex-col items-start gap-1">
-        <span className={size === "lg" ? "text-sm font-semibold leading-tight text-slate-900" : "text-[12px] font-semibold leading-tight text-slate-900"}>
-          {bubble.label}
-        </span>
-        <span
-          className={[
-            size === "lg" ? "text-[12px] font-medium" : "text-[11px] font-medium",
-            isHot ? "text-orange-700" : isCool ? "text-sky-700" : "text-slate-500",
-          ].join(" ")}
-        >
-          {stateLabel(state)}
-        </span>
-      </div>
-    </button>
-  );
+function stateAccent(s: Bubble["state"]) {
+  if (s === "hot") return { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700" };
+  if (s === "cool") return { bg: "bg-sky-50", border: "border-sky-200", text: "text-sky-700" };
+  return { bg: "bg-white", border: "border-slate-200", text: "text-slate-500" };
 }
 
 export default function BubbleBoard() {
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
   const [selected, setSelected] = useState<TopicDetail | null>(null);
 
-  const hotRef = useRef<HTMLDivElement | null>(null);
-  const coolRef = useRef<HTMLDivElement | null>(null);
-
   const CHANGE_MS = 10_000;
-  const [pairTick, setPairTick] = useState(0);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    const t = window.setInterval(() => setPairTick((x) => x + 1), CHANGE_MS);
+    const t = window.setInterval(() => setTick((x) => x + 1), CHANGE_MS);
     return () => window.clearInterval(t);
   }, []);
 
-  const [phase, setPhase] = useState(0);
-  const cycleStartRef = useRef<number>(performance.now());
-
+  // Simula aquecimento/esfriamento gradual
   useEffect(() => {
-    cycleStartRef.current = performance.now();
-    let raf = 0;
-    const loop = () => {
-      const now = performance.now();
-      const p = Math.min(1, Math.max(0, (now - cycleStartRef.current) / CHANGE_MS));
-      setPhase(p);
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [pairTick]);
-
-  const itemsWithCategory = useMemo(
-    () => data.flatMap((cat) => cat.items.map((b) => ({ ...b, category: cat.title }))),
-    [data]
-  );
-
-  const { hotBubble, coolBubble } = useMemo(() => {
-    const items = itemsWithCategory;
-    if (items.length < 2) return { hotBubble: items[0], coolBubble: items[1] };
-    return {
-      hotBubble: items[pairTick % items.length],
-      coolBubble: items[(pairTick + 1) % items.length],
-    };
-  }, [itemsWithCategory, pairTick]);
-
-  useEffect(() => {
-    if (!hotBubble || !coolBubble) return;
     const STEP_MS = 160;
     const t = window.setInterval(() => {
       setData((prev) =>
         prev.map((cat) => ({
           ...cat,
-          items: cat.items.map((b) => {
-            if (b.id === hotBubble.id) return { ...b, state: "hot", energy: clamp01(b.energy + 0.010), size: "md" };
-            if (b.id === coolBubble.id) return { ...b, state: "cool", energy: clamp01(b.energy - 0.008), size: "sm" };
+          items: cat.items.map((b, i) => {
+            // alterna um "par" pseudo-aleatório com base no tick
+            const hotIdx = (tick + i) % cat.items.length;
+            const coolIdx = (tick + i + 1) % cat.items.length;
+            if (cat.items[hotIdx]?.id === b.id) return { ...b, state: "hot", energy: clamp01(b.energy + 0.010) };
+            if (cat.items[coolIdx]?.id === b.id) return { ...b, state: "cool", energy: clamp01(b.energy - 0.008) };
             const baseline = 0.5;
             return { ...b, state: "steady", energy: clamp01(b.energy + (baseline - b.energy) * 0.02) };
           }),
@@ -200,87 +93,81 @@ export default function BubbleBoard() {
       );
     }, STEP_MS);
     return () => window.clearInterval(t);
-  }, [hotBubble?.id, coolBubble?.id]);
+  }, [tick]);
 
-  const hotGlow = 0.25 + 0.35 * phase;
-  const coolGlow = 0.35 - 0.2 * phase;
+  const itemsWithCategory = useMemo(
+    () => data.flatMap((cat) => cat.items.map((b) => ({ ...b, category: cat.title }))),
+    [data]
+  );
 
   const sortedItems = useMemo(() => {
-    return [...itemsWithCategory].sort((a, b) => b.energy - a.energy);
+    const priority = (s: Bubble["state"]) => (s === "hot" ? 0 : s === "cool" ? 1 : 2);
+    return [...itemsWithCategory].sort((a, b) => {
+      const pa = priority(a.state);
+      const pb = priority(b.state);
+      if (pa !== pb) return pa - pb;
+      return b.energy - a.energy;
+    });
   }, [itemsWithCategory]);
-
-  const getHotRect = useCallback(() => hotRef.current?.getBoundingClientRect() ?? null, []);
-  const getCoolRect = useCallback(() => coolRef.current?.getBoundingClientRect() ?? null, []);
 
   return (
     <>
-      <BubbleParticles
-        active={!!hotBubble}
-        mode="in"
-        colorVar="var(--hot-br)"
-        getSourceRect={getHotRect}
-        intensity={14}
-      />
-      <BubbleParticles
-        active={!!coolBubble}
-        mode="out"
-        colorVar="var(--cool-br)"
-        getSourceRect={getCoolRect}
-        intensity={12}
-      />
-
       <div className="w-full bg-slate-50 min-h-screen">
-        <div className="px-5 pb-10 pt-6 flex flex-col gap-5">
-          <div className="flex justify-center gap-3">
-            <div
-              className="relative"
-              style={{
-                filter: `drop-shadow(0 12px 32px rgba(255,119,29,${hotGlow.toFixed(2)}))`,
-              }}
-            >
-              <div ref={hotRef}>
-                {hotBubble ? (
-                  <TopicCard
-                    bubble={hotBubble as Bubble & { category: string }}
-                    onClick={() => setSelected(asDetail(hotBubble as Bubble))}
-                    size="lg"
-                    emphasize="hot"
-                  />
-                ) : null}
-              </div>
-            </div>
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 pb-10 pt-6">
+          {sortedItems.map((b) => {
+            const accent = stateAccent(b.state);
+            return (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => setSelected(asDetail(b))}
+                className={[
+                  "w-full text-left rounded-2xl border shadow-sm",
+                  "flex flex-col gap-2 px-4 py-4",
+                  "hover:shadow-md active:translate-y-[1px]",
+                  "transition",
+                  accent.bg,
+                  accent.border,
+                ].join(" ")}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className={[
+                      "rounded-full px-3 py-[5px] text-[11px] font-semibold tracking-wide",
+                      b.category === "ESPORTES" ? "bg-emerald-100 text-emerald-700" : "bg-indigo-100 text-indigo-700",
+                    ].join(" ")}
+                  >
+                    {b.category}
+                  </span>
+                  <span
+                    className={[
+                      "text-[12px] font-semibold px-2 py-1 rounded-full border",
+                      b.state === "hot"
+                        ? "border-orange-200 bg-orange-100 text-orange-800"
+                        : b.state === "cool"
+                        ? "border-sky-200 bg-sky-100 text-sky-800"
+                        : "border-slate-200 bg-slate-100 text-slate-700",
+                    ].join(" ")}
+                  >
+                    {stateLabel(b.state)}
+                  </span>
+                </div>
 
-            <div
-              className="relative"
-              style={{
-                filter: `drop-shadow(0 12px 28px rgba(56,189,248,${coolGlow.toFixed(2)}))`,
-              }}
-            >
-              <div ref={coolRef}>
-                {coolBubble ? (
-                  <TopicCard
-                    bubble={coolBubble as Bubble & { category: string }}
-                    onClick={() => setSelected(asDetail(coolBubble as Bubble))}
-                    size="lg"
-                    emphasize="cool"
-                  />
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-2">
-            <div className="flex flex-wrap gap-3 justify-center">
-              {sortedItems.map((b) => (
-                <TopicCard
-                  key={b.id}
-                  bubble={b}
-                  onClick={() => setSelected(asDetail(b))}
-                  size="sm"
-                />
-              ))}
-            </div>
-          </div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <p className="text-base font-semibold text-slate-900 leading-tight">{b.label}</p>
+                    <p className="mt-1 text-sm text-slate-500">Toque para ver por que está em alta</p>
+                  </div>
+                  <div className="shrink-0 text-right text-xs text-slate-500">
+                    <div className="font-semibold text-slate-700">
+                      {(b.energy * 100).toFixed(0)} pts
+                    </div>
+                    <div>intensidade</div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
