@@ -106,7 +106,6 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, []);
 
-  // phase (0..1) para scale progressivo dentro do ciclo de 10s
   const [phase, setPhase] = useState(0);
   const cycleStartRef = useRef<number>(performance.now());
 
@@ -135,7 +134,6 @@ export default function BubbleBoard() {
     };
   }, [activeCat, pairTick]);
 
-  // atualiza energy lentamente
   useEffect(() => {
     if (!activeCat || !hotBubble || !coolBubble) return;
 
@@ -162,8 +160,9 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, [activeIndex, activeCat, hotBubble?.id, coolBubble?.id]);
 
-  const hotScale = 0.72 + 1.72 * phase;
-  const coolScale = 1.32 - 0.62 * phase;
+  // quente cresce, fria diminui (contraste)
+  const hotScale = 0.72 + 0.68 * phase; // 0.72 -> 1.40
+  const coolScale = 1.32 - 0.56 * phase; // 1.32 -> 0.76
 
   const hotSeries = useMemo(() => makeSeries("up"), [pairTick, activeIndex]);
   const coolSeries = useMemo(() => makeSeries("down"), [pairTick, activeIndex]);
@@ -173,11 +172,11 @@ export default function BubbleBoard() {
 
   return (
     <>
-      {/* Partículas: quente entra / fria sai */}
       <BubbleParticles active={!!hotBubble} mode="in" colorVar="var(--hot-br)" getSourceRect={getHotRect} intensity={16} />
       <BubbleParticles active={!!coolBubble} mode="out" colorVar="var(--cool-br)" getSourceRect={getCoolRect} intensity={14} />
 
-      <div className="sticky top-0 z-50 bg-white/85 backdrop-blur border-b border-gray-100">
+      {/* Menu/tabs agora em "glass" (deixa o backdrop aparecer) */}
+      <div className="sticky top-0 z-50 border-b border-white/25 bg-white/35 backdrop-blur-md">
         <div className="px-5 py-3">
           <div className="flex gap-2">
             {data.map((cat, idx) => {
@@ -192,8 +191,10 @@ export default function BubbleBoard() {
                   }}
                   className={[
                     "px-3 py-2 rounded-full text-xs font-semibold tracking-widest",
-                    "transition border",
-                    active ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-gray-200",
+                    "transition border shadow-sm",
+                    active
+                      ? "bg-gray-900/90 text-white border-gray-900/60"
+                      : "bg-white/35 text-gray-700 border-white/35",
                   ].join(" ")}
                   aria-current={active ? "page" : undefined}
                 >
@@ -237,7 +238,6 @@ export default function BubbleBoard() {
                 style={{ minHeight: "calc(100dvh - 72px)" }}
               >
                 <div className="pt-7 flex flex-col gap-5">
-                  {/* Bolhas grandes com mais espaçamento */}
                   <div className="flex justify-center gap-10">
                     <button
                       ref={isActive ? hotRef : undefined}
@@ -247,7 +247,7 @@ export default function BubbleBoard() {
                       style={{ ["--e" as any]: hot?.energy ?? 0.6, transform: `scale(${hotScale})` }}
                     >
                       <div className="font-semibold text-[13px] px-2 text-center leading-tight">{hot?.label ?? "—"}</div>
-                      <div className="text-[10px] text-gray-600 mt-1">Aquecendo</div>
+                      <div className="text-[10px] text-gray-700/80 mt-1">Aquecendo</div>
                     </button>
 
                     <button
@@ -258,17 +258,15 @@ export default function BubbleBoard() {
                       style={{ ["--e" as any]: cool?.energy ?? 0.4, transform: `scale(${coolScale})` }}
                     >
                       <div className="font-semibold text-[13px] px-2 text-center leading-tight">{cool?.label ?? "—"}</div>
-                      <div className="text-[10px] text-gray-600 mt-1">Esfriando</div>
+                      <div className="text-[10px] text-gray-700/80 mt-1">Esfriando</div>
                     </button>
                   </div>
 
-                  {/* Único container com 2 SVGs */}
+                  {/* Gráfico: TrendChartsStack já é "card"; vamos fazer ele glass também (ver arquivo abaixo) */}
                   <TrendChartsStack
                     now={new Date()}
                     hot={{ name: hot?.label ?? "Quente", points: hotSeries }}
                     cool={{ name: cool?.label ?? "Frio", points: coolSeries }}
-                    hotHeight={140}
-                    coolHeight={150}
                   />
 
                   <div className="pt-1">
