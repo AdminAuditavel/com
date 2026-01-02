@@ -101,7 +101,7 @@ function MiniChart({
       <circle cx={endX} cy={endY} r="3.8" fill={color} />
 
       <g transform={`translate(${cardX}, ${cardY})`}>
-        <rect x={0} y={0} width={cardW} height={cardH} rx={12} fill="rgba(255,255,255,0.92)" />
+        <rect x={0} y={0} width={cardW} height={cardH} rx={12} fill="rgba(255,255,255,0.80)" />
         <text x={12} y={17} fontSize="11" fill="#374151">
           {name}
         </text>
@@ -138,7 +138,7 @@ export default function TrendChartsStack({
   width = 360,
   hotHeight = 130,
   coolHeight = 145,
-  overlapPx = 70, // <- aproxima (sobrepõe) o de baixo
+  overlapPx = 80,
 }: {
   hot: { name: string; points: Point[] };
   cool: { name: string; points: Point[] };
@@ -148,10 +148,10 @@ export default function TrendChartsStack({
   coolHeight?: number;
   overlapPx?: number;
 }) {
-  const pad = 10; // menor para reduzir “ar” interno
+  const pad = 10;
 
   return (
-    <div className="w-full rounded-xl bg-white/70 px-2 py-1">
+    <div className="w-full rounded-xl border border-white/25 bg-white/35 px-2 py-2 shadow-sm backdrop-blur-md">
       <div className="flex flex-col">
         <MiniChart
           name={hot.name}
@@ -165,7 +165,6 @@ export default function TrendChartsStack({
           pad={pad}
         />
 
-        {/* aproxima o segundo subindo */}
         <div style={{ marginTop: -overlapPx }}>
           <MiniChart
             name={cool.name}
