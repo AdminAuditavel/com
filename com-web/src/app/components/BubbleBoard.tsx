@@ -270,26 +270,30 @@ export default function BubbleBoard() {
                     </button>
                   </div>
 
-                  {/* Gráficos independentes (empilhados e próximos) */}
-                  <div className="flex flex-col gap-1">
+                  {/* Gráficos independentes (empilhados e “colados” para parecer um bloco só) */}
+                  <div className="flex flex-col gap-0">
                     <TrendChartSingle
                       now={new Date()}
                       name={hot?.label ?? "Quente"}
                       direction="up"
                       color="var(--hot-br)"
                       points={hotSeries}
-                      height={145}
+                      height={140}
                       showXAxis={false}
+                      compact
                     />
-                    <TrendChartSingle
-                      now={new Date()}
-                      name={cool?.label ?? "Frio"}
-                      direction="down"
-                      color="var(--cool-br)"
-                      points={coolSeries}
-                      height={155}
-                      showXAxis
-                    />
+                    <div className="-mt-2">
+                      <TrendChartSingle
+                        now={new Date()}
+                        name={cool?.label ?? "Frio"}
+                        direction="down"
+                        color="var(--cool-br)"
+                        points={coolSeries}
+                        height={150}
+                        showXAxis
+                        compact
+                      />
+                    </div>
                   </div>
 
                   {/* Grid de bolhas */}
