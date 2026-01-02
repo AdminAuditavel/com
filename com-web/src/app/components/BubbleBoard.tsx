@@ -614,8 +614,13 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
           <span className={categoryPill(b.category)}>{b.category}</span>
 
           <div className="flex items-center gap-2">
-            <span className={statePill(b.state)}>{stateLabel(b.state)}</span>
-
+            {/* pill técnico só aparece se NÃO houver badge editorial */}
+            {!badge && (
+              <span className={statePill(b.state)}>
+                {stateLabel(b.state)}
+              </span>
+            )}
+          
             <button
               type="button"
               onClick={(e) => {
