@@ -57,9 +57,9 @@ function stateLabel(s: Bubble["state"]) {
 }
 
 function stateAccent(s: Bubble["state"]) {
-  if (s === "hot") return { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700" };
-  if (s === "cool") return { bg: "bg-sky-50", border: "border-sky-200", text: "text-sky-700" };
-  return { bg: "bg-white", border: "border-slate-200", text: "text-slate-500" };
+  if (s === "hot") return { bg: "bg-orange-50", border: "border-orange-200" };
+  if (s === "cool") return { bg: "bg-sky-50", border: "border-sky-200" };
+  return { bg: "bg-white", border: "border-slate-200" };
 }
 
 function formatDeltaPct(v?: number) {
@@ -72,7 +72,15 @@ function formatDeltaPct(v?: number) {
 function TrendInline({ spark }: { spark?: number }) {
   const pct = formatDeltaPct(spark);
   const icon =
-    spark && spark > 0.5 ? "↑" : spark && spark < -0.5 ? "↓" : spark && spark > 0 ? "↗" : spark && spark < 0 ? "↘" : "→";
+    spark && spark > 0.5
+      ? "↑"
+      : spark && spark < -0.5
+      ? "↓"
+      : spark && spark > 0
+      ? "↗"
+      : spark && spark < 0
+      ? "↘"
+      : "→";
 
   return (
     <div className="shrink-0 text-right leading-tight">
@@ -99,55 +107,34 @@ function makeSeededRand(seed: number) {
   };
 }
 
-function WaveBars({
-  id,
-  state,
-  energy,
-}: {
-  id: string;
-  state: Bubble["state"];
-  energy: number;
-}) {
+function WaveBars({ id, state, energy }: { id: string; state: Bubble["state"]; energy: number }) {
   const v = clamp01(energy);
 
-  // cor por estado
   const barCls = state === "hot" ? "bg-orange-400" : state === "cool" ? "bg-sky-400" : "bg-slate-400";
-
-  // animação mais suave (quase "respiração")
   const dur = state === "hot" ? 1400 : state === "cool" ? 1700 : 2200;
-
-  // amplitude pequena: evita oscilação "equalizer"
   const amp = state === "hot" ? 0.16 : state === "cool" ? 0.10 : 0.06;
 
-  // base geral por energia (só para não ficar tudo minúsculo)
-  const baseLevel = 0.18 + v * 0.70; // 0.18..0.88
-
-  // barras mais densas e preenchendo largura
+  const baseLevel = 0.18 + v * 0.70;
   const COUNT = 26;
 
   const rand = makeSeededRand(hash32(id));
 
   const bars = Array.from({ length: COUNT }, (_, i) => {
-    const t = COUNT <= 1 ? 0 : i / (COUNT - 1); // 0..1
+    const t = COUNT <= 1 ? 0 : i / (COUNT - 1);
 
-    // rampa por estado:
-    // hot: começa pequeno e cresce
-    // cool: começa grande e diminui
-    // steady: quase constante
+    // rampas:
     const ramp =
-      state === "hot" ? 0.30 + t * 0.90 : state === "cool" ? 1.20 - t * 0.90 : 0.75 + (rand() * 0.08 - 0.04);
+      state === "hot"
+        ? 0.30 + t * 0.90
+        : state === "cool"
+        ? 1.20 - t * 0.90
+        : 0.78 + (rand() * 0.06 - 0.03);
 
-    // leve jitter só para não ficar "perfeito" demais (muito pequeno)
-    const jitter = rand() * 0.06 - 0.03;
-
-    // altura alvo (0..100)
+    const jitter = rand() * 0.05 - 0.025;
     const h0 = Math.round(clamp01(baseLevel * ramp + jitter) * 100);
 
-    // delays muito pequenos para dar sensação de movimento sem virar onda forte
-    const delay = Math.round((i * 28) * 10) / 10; // ms
-
-    // fase alternada minimalista
-    const phase = (i % 2 === 0 ? 1 : -1) * (0.25 + rand() * 0.25);
+    const delay = Math.round(i * 22 * 10) / 10;
+    const phase = (i % 2 === 0 ? 1 : -1) * (0.22 + rand() * 0.22);
 
     return { i, h0, delay, phase };
   });
@@ -155,7 +142,6 @@ function WaveBars({
   return (
     <div className="w-full h-full">
       <div className="relative w-full h-full rounded-2xl border border-slate-200 bg-white/70 overflow-hidden px-4 py-4">
-        {/* barras centralizadas verticalmente, preenchendo o card */}
         <div className="absolute inset-0 px-4 py-4 flex items-end gap-[6px]">
           {bars.map((b) => (
             <div
@@ -174,13 +160,10 @@ function WaveBars({
           ))}
         </div>
 
-        {/* legenda discreta no canto */}
         <div className="relative z-10 flex items-center justify-between text-[11px] text-slate-600">
           <span>
             Evidência:{" "}
-            <span className="font-semibold text-slate-900">
-              {v >= 0.72 ? "Alta" : v >= 0.45 ? "Média" : "Baixa"}
-            </span>
+            <span className="font-semibold text-slate-900">{v >= 0.72 ? "Alta" : v >= 0.45 ? "Média" : "Baixa"}</span>
           </span>
           <span className="text-slate-500">{state === "hot" ? "ganhando força" : state === "cool" ? "perdendo força" : "estável"}</span>
         </div>
@@ -193,7 +176,6 @@ function WaveBars({
           animation-timing-function: ease-in-out;
           animation-iteration-count: infinite;
         }
-
         @keyframes breathPulse {
           0% {
             transform: scaleY(calc(1 - var(--amp) * 0.55));
@@ -222,7 +204,7 @@ export default function BubbleBoard() {
   const CHANGE_MS = 10_000;
   const [tick, setTick] = useState(0);
 
-  // ordem estável por categoria (evita reinício do STEP)
+  // ordem estável por categoria (evita reiniciar STEP)
   const orderRef = useRef(
     INITIAL_DATA.map((cat) => ({
       title: cat.title,
@@ -240,11 +222,7 @@ export default function BubbleBoard() {
       const len = c.ids.length || 1;
       const hotIdx = tick % len;
       const coolIdx = (tick + 1) % len;
-      return {
-        title: c.title,
-        hotId: c.ids[hotIdx],
-        coolId: c.ids[coolIdx],
-      };
+      return { title: c.title, hotId: c.ids[hotIdx], coolId: c.ids[coolIdx] };
     });
   }, [tick]);
 
@@ -297,73 +275,67 @@ export default function BubbleBoard() {
       else steady.push(b);
     });
     const byEnergyDesc = (arr: typeof hot) => arr.sort((a, b) => b.energy - a.energy);
-    return {
-      hot: byEnergyDesc(hot),
-      cool: byEnergyDesc(cool),
-      steady: byEnergyDesc(steady),
-    };
+    return { hot: byEnergyDesc(hot), cool: byEnergyDesc(cool), steady: byEnergyDesc(steady) };
   }, [filtered]);
 
-  const renderOrderIds = useMemo(() => {
-    const ids: string[] = [];
-    grouped.hot.forEach((b) => ids.push(b.id));
-    grouped.cool.forEach((b) => ids.push(b.id));
-    grouped.steady.forEach((b) => ids.push(b.id));
-    return ids;
+  // lista “flat” renderizada
+  const flatList = useMemo(() => {
+    const out: (Bubble & { category: string; group: "hot" | "cool" | "steady" })[] = [];
+    grouped.hot.forEach((b) => out.push({ ...b, group: "hot" }));
+    grouped.cool.forEach((b) => out.push({ ...b, group: "cool" }));
+    grouped.steady.forEach((b) => out.push({ ...b, group: "steady" }));
+    return out;
   }, [grouped]);
 
-  // featured = primeiro visível no scroll
-  const [activeFeaturedId, setActiveFeaturedId] = useState<string | null>(null);
+  const byId = useMemo(() => {
+    const m = new Map<string, Bubble & { category: string; group: "hot" | "cool" | "steady" }>();
+    flatList.forEach((b) => m.set(b.id, b));
+    return m;
+  }, [flatList]);
 
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  // ===== Sticky featured (o que você pediu) =====
+  const [featuredId, setFeaturedId] = useState<string | null>(null);
+  const stickyRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
   const cardElsRef = useRef<Record<string, HTMLDivElement | null>>({});
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setActiveFeaturedId(renderOrderIds[0] ?? null);
-  }, [renderOrderIds]);
+    setFeaturedId(flatList[0]?.id ?? null);
+  }, [flatList]);
 
   const computeFeatured = useCallback(() => {
-  const sc = scrollRef.current;
-  if (!sc) return;
+    const sc = listRef.current;
+    const sticky = stickyRef.current;
+    if (!sc || !sticky) return;
 
-  const scRect = sc.getBoundingClientRect();
+    const stickyRect = sticky.getBoundingClientRect();
+    const targetY = stickyRect.bottom + 12; // “linha” logo abaixo do sticky
 
-  let bestId: string | null = null;
-  let bestScore = Number.POSITIVE_INFINITY;
+    let bestId: string | null = null;
+    let bestDist = Number.POSITIVE_INFINITY;
 
-  for (const id of renderOrderIds) {
-    const el = cardElsRef.current[id];
-    if (!el) continue;
+    for (const item of flatList) {
+      const el = cardElsRef.current[item.id];
+      if (!el) continue;
 
-    const r = el.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      // queremos o primeiro que está cruzando/abaixo do sticky
+      const dist = Math.abs(r.top - targetY);
 
-    // posição do card relativa ao container scrollável
-    const top = r.top - scRect.top;
-    const bottom = r.bottom - scRect.top;
+      // só considere cards que estejam abaixo ou tocando a região do sticky (evita pegar os que já passaram muito)
+      if (r.bottom <= stickyRect.bottom) continue;
 
-    // só considera cards que tenham QUALQUER interseção com o viewport do container
-    const isVisible = bottom > 0 && top < scRect.height;
-    if (!isVisible) continue;
-
-    /**
-     * Score:
-     * - Se top >= 0: quanto menor, mais "topmost" (primeiro visível)
-     * - Se top < 0 (card parcialmente acima): penaliza para preferir o próximo card que entrou
-     */
-    const score = top >= 0 ? top : scRect.height + Math.abs(top);
-
-    if (score < bestScore) {
-      bestScore = score;
-      bestId = id;
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestId = item.id;
+      }
     }
-  }
 
-  // garante que SEMPRE exista um featured se houver algum visível
-  if (bestId) {
-    setActiveFeaturedId((prev) => (prev === bestId ? prev : bestId));
-  }
-}, [renderOrderIds]);
+    if (bestId) {
+      setFeaturedId((prev) => (prev === bestId ? prev : bestId));
+    }
+  }, [flatList]);
 
   const onScroll = useCallback(() => {
     if (rafRef.current) return;
@@ -374,38 +346,35 @@ export default function BubbleBoard() {
   }, [computeFeatured]);
 
   useEffect(() => {
+    computeFeatured();
     const onResize = () => computeFeatured();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [computeFeatured]);
 
-  const cardSizes = (featured: boolean, idxInGroup: number) => {
-    if (featured) return "py-7 px-5";
-    if (idxInGroup === 0) return "py-5 px-4";
-    if (idxInGroup <= 2) return "py-4 px-4";
-    return "py-3 px-3";
+  const featured = featuredId ? byId.get(featuredId) ?? null : null;
+
+  // ===== UI helpers =====
+  const cardChrome = (b: Bubble) => {
+    const accent = stateAccent(b.state);
+    return [
+      "w-full text-left rounded-2xl border shadow-sm",
+      "flex flex-col gap-4",
+      "transition",
+      accent.bg,
+      accent.border,
+    ].join(" ");
   };
 
-  const renderCard = (b: Bubble & { category: string }, idx: number, group: "hot" | "cool" | "steady") => {
-    const accent = stateAccent(b.state);
+  const renderFeaturedCard = (b: Bubble & { category: string }) => {
     const likedState = liked[b.id];
-    const isFeatured = activeFeaturedId === b.id;
 
     return (
       <div
-        key={`${group}-${b.id}`}
-        ref={(el) => {
-          cardElsRef.current[b.id] = el;
-        }}
         className={[
-          "w-full text-left rounded-2xl border shadow-sm",
-          "flex flex-col gap-4",
-          "hover:shadow-md active:translate-y-[1px]",
-          "transition",
-          accent.bg,
-          accent.border,
-          isFeatured ? "shadow-md ring-2 ring-orange-200" : "",
-          cardSizes(isFeatured, idx),
+          cardChrome(b),
+          "shadow-md ring-2 ring-orange-200",
+          "py-7 px-5",
         ].join(" ")}
         onClick={() => setSelected(asDetail(b))}
       >
@@ -450,34 +419,99 @@ export default function BubbleBoard() {
           </div>
         </div>
 
-        {/* Assunto + tendência na MESMA LINHA (featured) */}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <p className={isFeatured ? "text-2xl md:text-3xl font-semibold text-slate-900 leading-tight" : "text-base font-semibold text-slate-900 leading-tight"}>
-              {b.label}
-            </p>
-            <p className={isFeatured ? "text-sm text-slate-600" : "text-sm text-slate-500"}>Toque para ver detalhes</p>
+            <p className="text-2xl md:text-3xl font-semibold text-slate-900 leading-tight">{b.label}</p>
+            <p className="text-sm text-slate-600">Toque para ver detalhes</p>
           </div>
 
-          {isFeatured && <TrendInline spark={b.spark ?? (b.state === "cool" ? -0.06 : 0.06)} />}
+          <TrendInline spark={b.spark ?? (b.state === "cool" ? -0.06 : 0.06)} />
         </div>
 
-        {/* Barras preenchendo e com mais altura (featured) */}
-        {isFeatured && (
-          <div className="w-full">
-            <div className="h-28 md:h-32">
-              <WaveBars id={b.id} state={b.state} energy={b.energy} />
-            </div>
+        <div className="w-full">
+          <div className="h-28 md:h-32">
+            <WaveBars id={b.id} state={b.state} energy={b.energy} />
           </div>
-        )}
+        </div>
       </div>
     );
   };
 
+  const renderListCard = (b: Bubble & { category: string; group: string }, idx: number) => {
+    const likedState = liked[b.id];
+
+    return (
+      <div
+        key={`${b.group}-${b.id}`}
+        ref={(el) => {
+          cardElsRef.current[b.id] = el;
+        }}
+        className={[
+          cardChrome(b),
+          idx === 0 ? "py-5 px-4" : "py-3 px-3",
+          "hover:shadow-md active:translate-y-[1px]",
+        ].join(" ")}
+        onClick={() => setSelected(asDetail(b))}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span
+            className={[
+              "rounded-full px-3 py-[5px] text-[11px] font-semibold tracking-wide",
+              b.category === "ESPORTES" ? "bg-emerald-100 text-emerald-700" : "bg-indigo-100 text-indigo-700",
+            ].join(" ")}
+          >
+            {b.category}
+          </span>
+
+          <div className="flex items-center gap-2">
+            <span
+              className={[
+                "text-[12px] font-semibold px-2 py-1 rounded-full border",
+                b.state === "hot"
+                  ? "border-orange-200 bg-orange-100 text-orange-800"
+                  : b.state === "cool"
+                  ? "border-sky-200 bg-sky-100 text-sky-800"
+                  : "border-slate-200 bg-slate-100 text-slate-700",
+              ].join(" ")}
+            >
+              {stateLabel(b.state)}
+            </span>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setLiked((prev) => ({ ...prev, [b.id]: !prev[b.id] }));
+              }}
+              className={[
+                "rounded-full border px-2 py-1 text-[12px] font-semibold",
+                likedState ? "bg-rose-500 border-rose-500 text-white" : "bg-white border-slate-200 text-slate-600",
+              ].join(" ")}
+              aria-label="Curtir"
+            >
+              ♥
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <p className="text-base font-semibold text-slate-900 leading-tight">{b.label}</p>
+          <p className="text-sm text-slate-500">Toque para ver detalhes</p>
+        </div>
+      </div>
+    );
+  };
+
+  // altura reservada para o sticky (spacer). Ajuste fino:
+  // - este valor precisa ficar próximo do height real do featured card.
+  // - como o featured é responsivo, usamos uma altura segura e estável.
+  const STICKY_SPACER = "h-[270px] md:h-[300px]";
+
   return (
     <>
       <div className="w-full bg-slate-50 min-h-screen">
-        <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur px-4 pt-4 pb-2 border-b border-slate-200">
+        {/* Search sticky */}
+        <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur px-4 pt-4 pb-2 border-b border-slate-200">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -486,15 +520,24 @@ export default function BubbleBoard() {
           />
         </div>
 
-        <div
-          ref={scrollRef}
-          onScroll={onScroll}
-          className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-12 pt-4 overflow-y-auto"
-          style={{ minHeight: "calc(100vh - 80px)" }}
-        >
-          {grouped.hot.length > 0 && grouped.hot.map((b, idx) => renderCard(b, idx, "hot"))}
-          {grouped.cool.length > 0 && grouped.cool.map((b, idx) => renderCard(b, idx, "cool"))}
-          {grouped.steady.length > 0 && grouped.steady.map((b, idx) => renderCard(b, idx, "steady"))}
+        <div className="mx-auto w-full max-w-3xl px-4 pt-4">
+          {/* Featured sticky (o “card principal” fixo) */}
+          <div ref={stickyRef} className="sticky top-[78px] z-20">
+            {featured ? renderFeaturedCard(featured) : null}
+          </div>
+
+          {/* List scroll area */}
+          <div
+            ref={listRef}
+            onScroll={onScroll}
+            className="flex flex-col gap-4 pb-12 overflow-y-auto"
+            style={{ height: "calc(100vh - 78px)" }}
+          >
+            {/* Spacer para não ficar a lista escondida sob o sticky */}
+            <div className={STICKY_SPACER} />
+
+            {flatList.map((b, idx) => renderListCard(b, idx))}
+          </div>
         </div>
       </div>
 
