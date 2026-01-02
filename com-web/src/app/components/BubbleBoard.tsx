@@ -56,25 +56,6 @@ function stateLabel(s: Bubble["state"]) {
   return "Estável";
 }
 
-function MessageSquareIcon({ hot }: { hot?: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={hot ? "text-orange-600" : "text-slate-500"}
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" />
-    </svg>
-  );
-}
-
 type TopicCardProps = {
   bubble: Bubble & { category: string };
   onClick: () => void;
@@ -87,7 +68,7 @@ function TopicCard({ bubble, onClick, size = "sm", emphasize }: TopicCardProps) 
   const isHot = state === "hot";
   const isCool = state === "cool";
 
-  const sizing = size === "lg" ? "w-28 h-28 p-3" : "w-24 h-24 p-2.5";
+  const sizing = size === "lg" ? "w-32 h-32 p-4" : "w-24 h-24 p-2.5";
   const fillColor =
     state === "hot"
       ? "rgb(255 237 213)" // orange-50
@@ -112,11 +93,8 @@ function TopicCard({ bubble, onClick, size = "sm", emphasize }: TopicCardProps) 
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400",
         sizing,
       ].join(" ")}
-      style={{
-        filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.06))",
-      }}
+      style={{ filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.06))" }}
     >
-      {/* fundo em formato message-square via SVG que você mandou */}
       <svg
         aria-hidden="true"
         className="absolute inset-0 w-full h-full"
@@ -141,14 +119,15 @@ function TopicCard({ bubble, onClick, size = "sm", emphasize }: TopicCardProps) 
         >
           {bubble.category}
         </span>
-        <MessageSquareIcon hot={isHot} />
       </div>
 
       <div className="relative z-10 flex flex-col items-start gap-1">
-        <span className="text-[12px] font-semibold leading-tight text-slate-900">{bubble.label}</span>
+        <span className={size === "lg" ? "text-sm font-semibold leading-tight text-slate-900" : "text-[12px] font-semibold leading-tight text-slate-900"}>
+          {bubble.label}
+        </span>
         <span
           className={[
-            "text-[11px] font-medium",
+            size === "lg" ? "text-[12px] font-medium" : "text-[11px] font-medium",
             isHot ? "text-orange-700" : isCool ? "text-sky-700" : "text-slate-500",
           ].join(" ")}
         >
@@ -256,7 +235,7 @@ export default function BubbleBoard() {
             <div
               className="relative"
               style={{
-                filter: `drop-shadow(0 10px 28px rgba(255,119,29,${hotGlow.toFixed(2)}))`,
+                filter: `drop-shadow(0 12px 32px rgba(255,119,29,${hotGlow.toFixed(2)}))`,
               }}
             >
               <div ref={hotRef}>
@@ -274,7 +253,7 @@ export default function BubbleBoard() {
             <div
               className="relative"
               style={{
-                filter: `drop-shadow(0 10px 24px rgba(56,189,248,${coolGlow.toFixed(2)}))`,
+                filter: `drop-shadow(0 12px 28px rgba(56,189,248,${coolGlow.toFixed(2)}))`,
               }}
             >
               <div ref={coolRef}>
