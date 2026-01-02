@@ -73,10 +73,8 @@ function MiniChart({
   const pct = boostedPercent(points, 2.4);
   const arrow = direction === "up" ? "↑" : "↓";
 
-  // posição do label (direita)
-  const labelX = width - pad;
+  // y do label (mantém dentro do SVG)
   let labelY = endY - 10;
-
   const axisH = showXAxis ? 14 : 0;
   const minY = pad + 14;
   const maxY = height - pad - axisH - 12;
@@ -87,56 +85,52 @@ function MiniChart({
   const t5 = new Date(now.getTime() - 5 * 60 * 1000);
   const t0 = now;
 
-  // “stroke” branco por trás do texto, pra ficar legível sem retângulo
+  // contorno escuro (para legibilidade sem “placa branca”)
   const outline = {
     paintOrder: "stroke" as const,
-    stroke: "rgba(255,255,255,0.92)",
-    strokeWidth: 4,
+    stroke: "rgba(2, 6, 23, 0.35)",
+    strokeWidth: 3,
     strokeLinejoin: "round" as const,
   };
 
+  const labelX = width - pad; // alinhar no limite direito
+
   return (
     <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-      <g opacity="0.75">
+      {/* grid mais escura (antes era #e5e7eb) */}
+      <g opacity="1">
         {[0.2, 0.5, 0.8].map((v) => {
           const y = yAt(v, height, pad);
-          return <line key={v} x1={pad} y1={y} x2={width - pad} y2={y} stroke="#e5e7eb" strokeWidth="1" />;
+          return (
+            <line
+              key={v}
+              x1={pad}
+              y1={y}
+              x2={width - pad}
+              y2={y}
+              stroke="rgba(2, 6, 23, 0.10)"
+              strokeWidth="1"
+            />
+          );
         })}
       </g>
 
       <path d={path} fill="none" stroke={color} strokeWidth="2.4" />
       <circle cx={endX} cy={endY} r="3.8" fill={color} />
 
-      {/* LABEL sem retângulo (só texto com contorno) */}
-      const labelX = width - pad; // limite direito do SVG
+      {/* LABEL alinhado à direita */}
       <g>
-        <text
-          x={labelX}
-          y={labelY}
-          fontSize="11"
-          fill="#374151"
-          textAnchor="end"
-          style={outline}
-        >
+        <text x={labelX} y={labelY} fontSize="11" fill="rgba(2, 6, 23, 0.80)" textAnchor="end" style={outline}>
           {name}
         </text>
-      
-        <text
-          x={labelX}
-          y={labelY + 18}
-          fontSize="14"
-          fill={color}
-          fontWeight={800}
-          textAnchor="end"
-          style={outline}
-        >
+        <text x={labelX} y={labelY + 18} fontSize="14" fill={color} fontWeight={800} textAnchor="end" style={outline}>
           {arrow}
           {pct}%
         </text>
       </g>
 
       {showXAxis && (
-        <g fill="#6b7280" fontSize="10">
+        <g fill="rgba(2, 6, 23, 0.55)" fontSize="10">
           <text x={xAt(0, width, pad)} y={height - 2} style={outline}>
             {fmtTime(t15)}
           </text>
@@ -175,7 +169,7 @@ export default function TrendChartsStack({
   const pad = 10;
 
   return (
-    <div className="w-full rounded-xl border border-white/25 bg-white/35 px-2 py-2 shadow-sm backdrop-blur-md">
+    <div className="w-full rounded-xl border border-white/15 bg-transparent px-2 py-2">
       <div className="flex flex-col">
         <MiniChart
           name={hot.name}
