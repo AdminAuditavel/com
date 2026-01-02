@@ -74,7 +74,7 @@ function MiniChart({
   const arrow = direction === "up" ? "↑" : "↓";
 
   // posição do label (direita)
-  const labelX = width - pad - 150;
+  const labelX = width - pad;
   let labelY = endY - 10;
 
   const axisH = showXAxis ? 14 : 0;
@@ -108,11 +108,28 @@ function MiniChart({
       <circle cx={endX} cy={endY} r="3.8" fill={color} />
 
       {/* LABEL sem retângulo (só texto com contorno) */}
-      <g transform={`translate(${labelX}, ${labelY})`}>
-        <text x={0} y={0} fontSize="11" fill="#374151" style={outline}>
+      const labelX = width - pad; // limite direito do SVG
+      <g>
+        <text
+          x={labelX}
+          y={labelY}
+          fontSize="11"
+          fill="#374151"
+          textAnchor="end"
+          style={outline}
+        >
           {name}
         </text>
-        <text x={0} y={18} fontSize="14" fill={color} fontWeight={800} style={outline}>
+      
+        <text
+          x={labelX}
+          y={labelY + 18}
+          fontSize="14"
+          fill={color}
+          fontWeight={800}
+          textAnchor="end"
+          style={outline}
+        >
           {arrow}
           {pct}%
         </text>
@@ -145,7 +162,7 @@ export default function TrendChartsStack({
   width = 360,
   hotHeight = 130,
   coolHeight = 145,
-  overlapPx = 30,
+  overlapPx = 35,
 }: {
   hot: { name: string; points: Point[] };
   cool: { name: string; points: Point[] };
