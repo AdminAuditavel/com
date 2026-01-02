@@ -3,7 +3,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  /* antes: #ffffff */
+  --background: #f2f4f7; /* cinza claro suave, estilo “overlay” */
   --foreground: #171717;
 
   /* Comentaram — tokens de cor (MVP) */
@@ -45,6 +46,10 @@
 
 body {
   background: var(--background);
+  /* um gradiente MUITO leve pra dar profundidade (opcional) */
+  background-image: radial-gradient(1200px 700px at 50% -200px, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0));
+  background-attachment: fixed;
+
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
@@ -314,7 +319,7 @@ body {
     opacity: 0;
   }
   10% {
-    opacity: 0.85;
+    opacity:  0.85;
   }
   100% {
     transform: translate(var(--x1), var(--y1)) scale(1.1) rotate(var(--rot, 0deg));
