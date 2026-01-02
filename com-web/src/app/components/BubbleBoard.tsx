@@ -62,7 +62,7 @@ function stateAccent(s: Bubble["state"]) {
   return { bg: "bg-white", border: "border-slate-200", text: "text-slate-500" };
 }
 
-// deterministic pseudo-random (para evitar mismatch de hidratação)
+// deterministic pseudo-random
 function hash32(str: string) {
   let h = 0;
   for (let i = 0; i < str.length; i++) h = (h << 5) - h + str.charCodeAt(i);
@@ -101,26 +101,23 @@ function formatTimeLabel(offsetMin: number) {
 
 function Sparkline({ id, mode, value }: { id: string; mode: "up" | "down"; value: number }) {
   const pts = useMemo(() => makeTrendPointsDet(id, mode, value), [id, mode, value]);
-  const path = useMemo(() => {
-    const xs = [0, 33.3, 66.6, 100];
-    const x = (_: number, i: number) => xs[i];
-    const y = (v: number) => 8 + (1 - v) * 84; // padding 8 top/bottom
-    return pts
-      .map((p, i) => `${i === 0 ? "M" : "L"} ${x(p.t, i)},${y(p.v)}`)
-      .join(" ");
-  }, [pts]);
+  const xPos = [0, 33.3, 66.6, 100];
+  const yPos = (v: number) => 8 + (1 - v) * 84; // padding top/bottom
 
-  const lastY = 8 + (1 - pts[pts.length - 1].v) * 84;
+  const path = pts
+    .map((p, i) => `${i === 0 ? "M" : "L"} ${xPos[i]},${yPos(p.v)}`)
+    .join(" ");
+  const lastY = yPos(pts[pts.length - 1].v);
   const deltaPct = value ?? 0;
   const times = [15, 10, 5, 0].map((m) => formatTimeLabel(m));
   const gridLevels = [0, 0.25, 0.5, 1];
 
   return (
     <div className="w-full">
-      <svg viewBox="0 0 120 110" className="h-28 w-full">
-        {/* grid horizontal */}
+      <svg viewBox="0 0 100 110" className="h-32 w-full">
+        {/* grid horizontal dentro da largura total */}
         {gridLevels.map((lv) => {
-          const yy = 8 + (1 - lv) * 84;
+          const yy = yPos(lv);
           return (
             <g key={lv}>
               <line
@@ -133,8 +130,9 @@ function Sparkline({ id, mode, value }: { id: string; mode: "up" | "down"; value
                 strokeDasharray="4 3"
               />
               <text
-                x={104}
+                x={99}
                 y={yy + 3}
+                textAnchor="end"
                 className="text-[9px] fill-slate-500"
               >
                 {Math.round(lv * 100)}%
@@ -151,12 +149,12 @@ function Sparkline({ id, mode, value }: { id: string; mode: "up" | "down"; value
         </defs>
         <path d={path} fill="none" stroke={mode === "up" ? "#f97316" : "#0ea5e9"} strokeWidth={2.2} />
         <polyline points={`0,110 100,110 100,${lastY}`} fill={`url(#grad-${id}-${mode})`} opacity="0.18" />
-        <circle r={3.6} fill={mode === "up" ? "#f97316" : "#0ea5e9"} cx="100" cy={lastY} />
+        <circle r={3.8} fill={mode === "up" ? "#f97316" : "#0ea5e9"} cx="100" cy={lastY} />
         <text x="100" y={lastY - 5} textAnchor="end" className="text-[10px] fill-slate-700 font-semibold">
           {deltaPct > 0 ? `+${Math.round(deltaPct * 100)}%` : `${Math.round(deltaPct * 100)}%`}
         </text>
       </svg>
-      <div className="flex justify-between text-[11px] text-slate-600 mt-1 px-1">
+      <div className="flex justify-between text-[11px] text-slate-600 mt-1">
         {times.map((t) => (
           <span key={t}>{t}</span>
         ))}
@@ -313,7 +311,7 @@ export default function BubbleBoard() {
 
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
-            <p className={isMain ? "text-lg font-semibold text-slate-900 leading-tight" : "text-base font-semibold text-slate-900 leading-tight"}>
+            <p className={isMain ? "text-xl font-semibold text-slate-900 leading-tight" : "text-base font-semibold text-slate-900 leading-tight"}>
               {b.label}
             </p>
             <p className="mt-1 text-sm text-slate-500">Toque para ver detalhes</p>
@@ -325,7 +323,7 @@ export default function BubbleBoard() {
         </div>
 
         {isMain && (
-          <div className="mt-1">
+          <div className="mt-1 w-full">
             <Sparkline
               id={b.id}
               mode={b.state === "cool" ? "down" : "up"}
@@ -339,7 +337,6 @@ export default function BubbleBoard() {
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const onScroll = useCallback(() => {
-    // reservado para sticky behaviors futuros
     scrollRef.current?.scrollTop;
   }, []);
 
