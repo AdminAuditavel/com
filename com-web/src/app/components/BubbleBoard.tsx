@@ -56,18 +56,6 @@ function stateLabel(s: Bubble["state"]) {
   return "Estável";
 }
 
-function makeSeries(mode: "up" | "down") {
-  const pts: { t: number; v: number }[] = [];
-  let v = mode === "up" ? 0.35 : 0.7;
-
-  for (let i = 0; i <= 15; i++) {
-    const drift = mode === "up" ? 0.018 : -0.018;
-    v = clamp01(v + drift + (Math.random() * 0.06 - 0.03));
-    pts.push({ t: i, v });
-  }
-  return pts;
-}
-
 function MessageSquareIcon({ hot }: { hot?: boolean }) {
   return (
     <svg
@@ -99,8 +87,6 @@ function TopicCard({ bubble, onClick, size = "sm", emphasize }: TopicCardProps) 
   const isHot = state === "hot";
   const isCool = state === "cool";
 
-  const base =
-    "flex flex-col justify-between rounded-2xl border shadow-sm transition hover:-translate-y-[1px] hover:shadow-md active:translate-y-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400";
   const sizing = size === "lg" ? "w-28 h-28 p-3" : "w-24 h-24 p-2.5";
   const palette =
     state === "hot"
@@ -108,9 +94,35 @@ function TopicCard({ bubble, onClick, size = "sm", emphasize }: TopicCardProps) 
       : state === "cool"
       ? "bg-sky-50 border-sky-200"
       : "bg-white border-slate-200";
+  const tailPalette =
+    state === "hot"
+      ? "bg-orange-50 border-orange-200"
+      : state === "cool"
+      ? "bg-sky-50 border-sky-200"
+      : "bg-white border-slate-200";
 
   return (
-    <button type="button" onClick={onClick} className={`${base} ${sizing} ${palette}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "relative overflow-visible",
+        "flex flex-col justify-between rounded-2xl border shadow-sm",
+        "transition hover:-translate-y-[1px] hover:shadow-md active:translate-y-0",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400",
+        sizing,
+        palette,
+      ].join(" ")}
+    >
+      {/* cauda do balão (message-square) */}
+      <span
+        aria-hidden="true"
+        className={[
+          "absolute -bottom-2 left-3 w-3 h-3 rotate-45",
+          tailPalette,
+          "border-t border-l",
+        ].join(" ")}
+      />
       <div className="flex items-center justify-between gap-1">
         <span
           className={[
@@ -140,7 +152,6 @@ function TopicCard({ bubble, onClick, size = "sm", emphasize }: TopicCardProps) 
 
 export default function BubbleBoard() {
   const [data, setData] = useState<CategoryBlock[]>(INITIAL_DATA);
-
   const [selected, setSelected] = useState<TopicDetail | null>(null);
 
   const hotRef = useRef<HTMLDivElement | null>(null);
@@ -160,14 +171,12 @@ export default function BubbleBoard() {
   useEffect(() => {
     cycleStartRef.current = performance.now();
     let raf = 0;
-
     const loop = () => {
       const now = performance.now();
       const p = Math.min(1, Math.max(0, (now - cycleStartRef.current) / CHANGE_MS));
       setPhase(p);
       raf = requestAnimationFrame(loop);
     };
-
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, [pairTick]);
@@ -180,7 +189,6 @@ export default function BubbleBoard() {
   const { hotBubble, coolBubble } = useMemo(() => {
     const items = itemsWithCategory;
     if (items.length < 2) return { hotBubble: items[0], coolBubble: items[1] };
-
     return {
       hotBubble: items[pairTick % items.length],
       coolBubble: items[(pairTick + 1) % items.length],
@@ -189,7 +197,6 @@ export default function BubbleBoard() {
 
   useEffect(() => {
     if (!hotBubble || !coolBubble) return;
-
     const STEP_MS = 160;
     const t = window.setInterval(() => {
       setData((prev) =>
@@ -198,18 +205,15 @@ export default function BubbleBoard() {
           items: cat.items.map((b) => {
             if (b.id === hotBubble.id) return { ...b, state: "hot", energy: clamp01(b.energy + 0.010), size: "md" };
             if (b.id === coolBubble.id) return { ...b, state: "cool", energy: clamp01(b.energy - 0.008), size: "sm" };
-
             const baseline = 0.5;
             return { ...b, state: "steady", energy: clamp01(b.energy + (baseline - b.energy) * 0.02) };
           }),
         }))
       );
     }, STEP_MS);
-
     return () => window.clearInterval(t);
   }, [hotBubble?.id, coolBubble?.id]);
 
-  // hot ganha glow, cool reduz glow — não usamos mais escala de bolha
   const hotGlow = 0.25 + 0.35 * phase;
   const coolGlow = 0.35 - 0.2 * phase;
 
