@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import TopicModal, { type TopicDetail } from "@/app/components/TopicModal";
 
 type Bubble = {
@@ -9,7 +9,7 @@ type Bubble = {
   state: "hot" | "steady" | "cool";
   size: "lg" | "md" | "sm";
   energy: number; // 0..1
-  spark?: number; // trend % (-1..+1 aproximado)
+  spark?: number; // trend %
 };
 
 type CategoryBlock = {
@@ -72,13 +72,10 @@ function formatDeltaPct(v?: number) {
 function TrendPill({ state, spark }: { state: Bubble["state"]; spark?: number }) {
   const pct = formatDeltaPct(spark);
   const abs = Math.abs((spark ?? 0) * 100);
+  const icon =
+    spark && spark > 0.5 ? "↑" : spark && spark < -0.5 ? "↓" : spark && spark > 0 ? "↗" : spark && spark < 0 ? "↘" : "→";
 
-  // seta/símbolo simples e interpretável
-  const icon = spark && spark > 0.5 ? "↑" : spark && spark < -0.5 ? "↓" : spark && spark > 0 ? "↗" : spark && spark < 0 ? "↘" : "→";
-
-  // mensagem curta e sem “dashboard”
-  const label =
-    abs < 1 ? "quase estável" : spark && spark > 0 ? "subindo" : spark && spark < 0 ? "caindo" : "estável";
+  const label = abs < 1 ? "quase estável" : spark && spark > 0 ? "subindo" : spark && spark < 0 ? "caindo" : "estável";
 
   const cls =
     state === "hot"
@@ -96,40 +93,92 @@ function TrendPill({ state, spark }: { state: Bubble["state"]; spark?: number })
   );
 }
 
-function HeatBar({ energy, state }: { energy: number; state: Bubble["state"] }) {
+// deterministic pseudo-random
+function hash32(str: string) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h << 5) - h + str.charCodeAt(i);
+  return h >>> 0;
+}
+function makeSeededRand(seed: number) {
+  let s = seed || 1;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 0xffffffff;
+  };
+}
+
+function WaveBars({ id, state, energy }: { id: string; state: Bubble["state"]; energy: number }) {
   const v = clamp01(energy);
 
-  // cor “semáforo” leve baseada no estado, mas sem exagero
-  const fill =
-    state === "hot" ? "bg-orange-400" : state === "cool" ? "bg-sky-400" : "bg-slate-400";
+  const base = 0.25 + v * 0.65; // 0.25..0.90
+  const amp = state === "hot" ? 0.55 : state === "cool" ? 0.22 : 0.12;
+  const dur = state === "hot" ? 900 : state === "cool" ? 1200 : 1600;
 
-  // posição do marcador (0..100%)
-  const left = `${Math.round(v * 100)}%`;
+  const barCls = state === "hot" ? "bg-orange-400" : state === "cool" ? "bg-sky-400" : "bg-slate-400";
+
+  const seed = hash32(id);
+  const rand = makeSeededRand(seed);
+
+  const bars = Array.from({ length: 17 }, (_, i) => {
+    const shape = 0.65 + rand() * 0.7; // 0.65..1.35
+    const h0 = Math.round(clamp01(base * shape) * 100);
+    const delay = Math.round((i * 55 + rand() * 40) * 10) / 10;
+    const phase = (i % 2 === 0 ? 1 : -1) * (0.6 + rand() * 0.6);
+    return { i, h0, delay, phase };
+  });
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between text-[11px] text-slate-500 mb-2">
-        <span>Baixo</span>
-        <span>Médio</span>
-        <span>Alto</span>
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-xs text-slate-600">
+          Nível de evidência:{" "}
+          <span className="font-semibold text-slate-900">{v >= 0.72 ? "Alto" : v >= 0.45 ? "Médio" : "Baixo"}</span>
+        </div>
+
+        <div className="text-xs text-slate-500">{state === "hot" ? "em alta" : state === "cool" ? "perdendo força" : "estável"}</div>
       </div>
 
-      <div className="relative h-3 w-full rounded-full bg-slate-200 overflow-hidden">
-        {/* preenchimento “grossão” */}
-        <div className={["absolute left-0 top-0 h-full", fill].join(" ")} style={{ width: left, opacity: 0.65 }} />
-        {/* marcador */}
-        <div
-          className="absolute top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-white border border-slate-300 shadow-sm"
-          style={{ left, transform: "translate(-50%, -50%)" }}
-        />
+      <div className="h-12 w-full rounded-2xl border border-slate-200 bg-white/70 px-3 flex items-end gap-[6px] overflow-hidden">
+        {bars.map((b) => (
+          <div
+            key={b.i}
+            className={["w-[7px] rounded-full opacity-90", barCls, "wavebar"].join(" ")}
+            style={
+              {
+                height: `${b.h0}%`,
+                animationDuration: `${dur}ms`,
+                animationDelay: `${b.delay}ms`,
+                ["--amp" as any]: amp,
+                ["--phase" as any]: b.phase,
+              } as React.CSSProperties
+            }
+          />
+        ))}
       </div>
 
-      <div className="mt-2 text-xs text-slate-600">
-        Nível de evidência:{" "}
-        <span className="font-semibold text-slate-900">
-          {v >= 0.72 ? "Alto" : v >= 0.45 ? "Médio" : "Baixo"}
-        </span>
-      </div>
+      <style jsx>{`
+        .wavebar {
+          transform-origin: bottom;
+          animation-name: wavePulse;
+          animation-timing-function: ease-in-out;
+          animation-iteration-count: infinite;
+        }
+
+        @keyframes wavePulse {
+          0% {
+            transform: scaleY(calc(1 - var(--amp) * 0.35));
+            opacity: 0.78;
+          }
+          50% {
+            transform: scaleY(calc(1 + var(--amp) * (0.65 + var(--phase) * 0.08)));
+            opacity: 0.95;
+          }
+          100% {
+            transform: scaleY(calc(1 - var(--amp) * 0.28));
+            opacity: 0.8;
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -143,7 +192,6 @@ export default function BubbleBoard() {
   const CHANGE_MS = 10_000;
   const [tick, setTick] = useState(0);
 
-  // ordem estável por categoria (evita effect reiniciar a cada 160ms)
   const orderRef = useRef(
     INITIAL_DATA.map((cat) => ({
       title: cat.title,
@@ -195,17 +243,12 @@ export default function BubbleBoard() {
     return () => window.clearInterval(t);
   }, [hotCoolByCategory]);
 
-  const itemsWithCategory = useMemo(
-    () => data.flatMap((cat) => cat.items.map((b) => ({ ...b, category: cat.title }))),
-    [data]
-  );
+  const itemsWithCategory = useMemo(() => data.flatMap((cat) => cat.items.map((b) => ({ ...b, category: cat.title }))), [data]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return itemsWithCategory;
-    return itemsWithCategory.filter(
-      (b) => b.label.toLowerCase().includes(q) || b.category.toLowerCase().includes(q)
-    );
+    return itemsWithCategory.filter((b) => b.label.toLowerCase().includes(q) || b.category.toLowerCase().includes(q));
   }, [itemsWithCategory, search]);
 
   const grouped = useMemo(() => {
@@ -225,7 +268,6 @@ export default function BubbleBoard() {
     };
   }, [filtered]);
 
-  // ordem renderizada (hot -> cool -> steady)
   const renderOrderIds = useMemo(() => {
     const ids: string[] = [];
     grouped.hot.forEach((b) => ids.push(b.id));
@@ -234,7 +276,6 @@ export default function BubbleBoard() {
     return ids;
   }, [grouped]);
 
-  // card “featured”: primeiro visível no scroll (vai mudando conforme rola)
   const [activeGraphId, setActiveGraphId] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -348,26 +389,17 @@ export default function BubbleBoard() {
         </div>
 
         <div className="flex flex-col gap-1">
-          <p
-            className={[
-              isFeatured
-                ? "text-2xl md:text-3xl font-semibold text-slate-900 leading-tight"
-                : "text-base font-semibold text-slate-900 leading-tight",
-            ].join(" ")}
-          >
+          <p className={isFeatured ? "text-2xl md:text-3xl font-semibold text-slate-900 leading-tight" : "text-base font-semibold text-slate-900 leading-tight"}>
             {b.label}
           </p>
-          <p className={isFeatured ? "text-sm text-slate-600" : "text-sm text-slate-500"}>
-            Toque para ver detalhes
-          </p>
+          <p className={isFeatured ? "text-sm text-slate-600" : "text-sm text-slate-500"}>Toque para ver detalhes</p>
         </div>
 
-        {/* SINAL DE LEITURA RÁPIDA (featured) */}
         {isFeatured && (
           <div className="w-full rounded-2xl border border-slate-200 bg-white/70 p-4">
             <div className="flex flex-col gap-3">
               <TrendPill state={b.state} spark={b.spark ?? (b.state === "cool" ? -0.06 : 0.06)} />
-              <HeatBar energy={b.energy} state={b.state} />
+              <WaveBars id={b.id} state={b.state} energy={b.energy} />
             </div>
           </div>
         )}
