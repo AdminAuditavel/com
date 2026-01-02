@@ -164,8 +164,8 @@ export default function BubbleBoard() {
 
   const [selected, setSelected] = useState<TopicDetail | null>(null);
 
-  const hotRef = useRef<HTMLButtonElement | null>(null);
-  const coolRef = useRef<HTMLButtonElement | null>(null);
+  const hotRef = useRef<HTMLDivElement | null>(null);
+  const coolRef = useRef<HTMLDivElement | null>(null);
 
   const activeCat = data[activeIndex];
 
