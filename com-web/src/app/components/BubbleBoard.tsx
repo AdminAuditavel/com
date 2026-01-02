@@ -122,7 +122,6 @@ function WaveBars({ id, state, energy }: { id: string; state: Bubble["state"]; e
   const bars = Array.from({ length: COUNT }, (_, i) => {
     const t = COUNT <= 1 ? 0 : i / (COUNT - 1);
 
-    // rampas:
     const ramp =
       state === "hot"
         ? 0.30 + t * 0.90
@@ -293,49 +292,75 @@ export default function BubbleBoard() {
     return m;
   }, [flatList]);
 
-  // ===== Sticky featured (o que você pediu) =====
+  // ===== Sticky featured =====
   const [featuredId, setFeaturedId] = useState<string | null>(null);
+
   const stickyRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const cardElsRef = useRef<Record<string, HTMLDivElement | null>>({});
   const rafRef = useRef<number | null>(null);
 
+  // altura real do sticky + spacer dinâmico
+  const [stickyH, setStickyH] = useState<number>(280);
+
   useEffect(() => {
     setFeaturedId(flatList[0]?.id ?? null);
   }, [flatList]);
 
+  useEffect(() => {
+    if (!stickyRef.current) return;
+
+    const el = stickyRef.current;
+    const ro = new ResizeObserver(() => {
+      const h = el.getBoundingClientRect().height;
+      if (h > 0) setStickyH(h);
+    });
+    ro.observe(el);
+
+    // set inicial
+    const h0 = el.getBoundingClientRect().height;
+    if (h0 > 0) setStickyH(h0);
+
+    return () => ro.disconnect();
+  }, []);
+
   const computeFeatured = useCallback(() => {
     const sc = listRef.current;
-    const sticky = stickyRef.current;
-    if (!sc || !sticky) return;
+    if (!sc) return;
 
-    const stickyRect = sticky.getBoundingClientRect();
-    const targetY = stickyRect.bottom + 12; // “linha” logo abaixo do sticky
+    // a “linha” logo abaixo do sticky dentro do scroll container
+    const targetY = sc.scrollTop + stickyH + 16;
+
+    // escolhe o card cujo topo está mais próximo (>= targetY - tolerância)
+    const TOL = 10;
 
     let bestId: string | null = null;
-    let bestDist = Number.POSITIVE_INFINITY;
+    let bestDelta = Number.POSITIVE_INFINITY;
 
     for (const item of flatList) {
       const el = cardElsRef.current[item.id];
       if (!el) continue;
 
-      const r = el.getBoundingClientRect();
-      // queremos o primeiro que está cruzando/abaixo do sticky
-      const dist = Math.abs(r.top - targetY);
+      const top = el.offsetTop; // relativo ao scroll container
+      const delta = top - targetY;
 
-      // só considere cards que estejam abaixo ou tocando a região do sticky (evita pegar os que já passaram muito)
-      if (r.bottom <= stickyRect.bottom) continue;
-
-      if (dist < bestDist) {
-        bestDist = dist;
+      // queremos o primeiro que “assume” abaixo do sticky:
+      // delta >= -TOL (permite pequena sobreposição)
+      if (delta >= -TOL && delta < bestDelta) {
+        bestDelta = delta;
         bestId = item.id;
       }
+    }
+
+    // se chegamos no final e não há ninguém “abaixo” da linha, o featured vira o último
+    if (!bestId && flatList.length > 0) {
+      bestId = flatList[flatList.length - 1].id;
     }
 
     if (bestId) {
       setFeaturedId((prev) => (prev === bestId ? prev : bestId));
     }
-  }, [flatList]);
+  }, [flatList, stickyH]);
 
   const onScroll = useCallback(() => {
     if (rafRef.current) return;
@@ -502,10 +527,8 @@ export default function BubbleBoard() {
     );
   };
 
-  // altura reservada para o sticky (spacer). Ajuste fino:
-  // - este valor precisa ficar próximo do height real do featured card.
-  // - como o featured é responsivo, usamos uma altura segura e estável.
-  const STICKY_SPACER = "h-[270px] md:h-[300px]";
+  // (valor usado só para “folga” adicional)
+  const spacerH = Math.max(200, stickyH + 16);
 
   return (
     <>
@@ -521,27 +544,32 @@ export default function BubbleBoard() {
         </div>
 
         <div className="mx-auto w-full max-w-3xl px-4 pt-4">
-          {/* Featured sticky (o “card principal” fixo) */}
+          {/* Featured sticky (card principal fixo) */}
           <div ref={stickyRef} className="sticky top-[78px] z-20">
             {featured ? renderFeaturedCard(featured) : null}
           </div>
 
-          {/* List scroll area */}
+          {/* Lista com scroll */}
           <div
             ref={listRef}
             onScroll={onScroll}
             className="flex flex-col gap-4 pb-12 overflow-y-auto"
             style={{ height: "calc(100vh - 78px)" }}
           >
-            {/* Spacer para não ficar a lista escondida sob o sticky */}
-            <div className={STICKY_SPACER} />
+            {/* Spacer dinâmico para a lista não ficar escondida sob o sticky */}
+            <div style={{ height: spacerH }} />
 
             {flatList.map((b, idx) => renderListCard(b, idx))}
           </div>
         </div>
       </div>
 
-      <TopicModal open={!!selected} topic={selected} onClose={() => setSelected(null)} />
+      {/* Wrapper FIXO para garantir que o modal apareça no topo da tela */}
+      <div className="fixed inset-0 z-[999] pointer-events-none">
+        <div className="pointer-events-auto">
+          <TopicModal open={!!selected} topic={selected} onClose={() => setSelected(null)} />
+        </div>
+      </div>
     </>
   );
 }
