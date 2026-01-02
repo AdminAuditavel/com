@@ -12,6 +12,7 @@ type Bubble = {
   size: "lg" | "md" | "sm";
   energy: number; // 0..1
   spark?: number; // trend % (aqui passará a ser recent_growth)
+  evidence_score?: number; // <-- novo
 };
 
 type CategoryBlock = {
@@ -179,6 +180,34 @@ function stepEnergy(prevEnergy: number, state: Bubble["state"]) {
   return clamp01(e + (baseline - e) * 0.03);
 }
 
+function clamp(n: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, n));
+}
+
+/**
+ * evidence_score (0..100)
+ * Intuição:
+ * - growth (spark) pesa mais (produto = “agora”)
+ * - energy pesa bastante (massa)
+ * - bônus editorial para hot/cool (sem exagero)
+ */
+function computeEvidenceScore(energy: number, growth: number, state: Bubble["state"]) {
+  const e = clamp(energy, 0, 1);
+  const g = clamp(growth, -0.25, 0.25); // corta extremos para estabilidade
+
+  // normaliza growth para 0..1 em torno de 0
+  const g01 = (g + 0.25) / 0.5; // -0.25 -> 0 ; +0.25 -> 1
+
+  // base: growth domina um pouco (A+C)
+  let score = (g01 * 0.60 + e * 0.40) * 100;
+
+  // toque editorial: hot ganha leve bônus; cool perde leve
+  if (state === "hot") score += 6;
+  if (state === "cool") score -= 4;
+
+  return clamp(score, 0, 100);
+}
+
 function WaveBars({ id, state, energy }: { id: string; state: Bubble["state"]; energy: number }) {
   const v = clamp01(energy);
 
@@ -313,12 +342,15 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
           items: cat.items.map((b) => {
             const g = simulateGrowthDet(b.id, tick);
             const state = toStateFromGrowth(g, b.state);
-
+            const nextEnergy = stepEnergy(b.energy, state);
+            const score = computeEvidenceScore(nextEnergy, g, state);
+            
             return {
               ...b,
               spark: g,
               state,
-              energy: stepEnergy(b.energy, state),
+              energy: nextEnergy,
+              evidence_score: score,
             };
           }),
         }))
@@ -350,8 +382,14 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
       else if (b.state === "cool") cool.push(b);
       else steady.push(b);
     });
-    const byEnergyDesc = (arr: typeof hot) => arr.sort((a, b) => b.energy - a.energy);
-    return { hot: byEnergyDesc(hot), cool: byEnergyDesc(cool), steady: byEnergyDesc(steady) };
+    const byEvidenceDesc = (arr: typeof hot) =>
+      arr.sort((a, b) => (b.evidence_score ?? 0) - (a.evidence_score ?? 0));
+    
+    return {
+      hot: byEvidenceDesc(hot),
+      cool: byEvidenceDesc(cool),
+      steady: byEvidenceDesc(steady),
+    };
   }, [filtered]);
 
   const flatList = useMemo(() => {
