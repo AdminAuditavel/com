@@ -66,11 +66,11 @@ function MessageSquareIcon({ hot }: { hot?: boolean }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.7"
+      strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M5 4h14a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2h-5.5L8.5 21v-4.5H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+      <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" />
     </svg>
   );
 }
@@ -94,18 +94,6 @@ function TopicCard({ bubble, onClick, size = "sm", emphasize }: TopicCardProps) 
       : state === "cool"
       ? "bg-sky-50 border-sky-200"
       : "bg-white border-slate-200";
-  const tailBorder =
-    state === "hot"
-      ? "border-orange-200"
-      : state === "cool"
-      ? "border-sky-200"
-      : "border-slate-200";
-  const tailBg =
-    state === "hot"
-      ? "bg-orange-50"
-      : state === "cool"
-      ? "bg-sky-50"
-      : "bg-white";
 
   return (
     <button
@@ -114,24 +102,48 @@ function TopicCard({ bubble, onClick, size = "sm", emphasize }: TopicCardProps) 
       className={[
         "relative overflow-visible",
         "flex flex-col justify-between",
-        "rounded-[10px] border shadow-sm",
+        "rounded-[8px] border shadow-sm",
         "transition hover:-translate-y-[1px] hover:shadow-md active:translate-y-0",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400",
         sizing,
         palette,
       ].join(" ")}
     >
-      {/* cauda do balão (message-square) centralizada */}
+      {/* cauda estilo message-square (canto inferior esquerdo) */}
       <span
         aria-hidden="true"
         className={[
-          "pointer-events-none absolute -bottom-2 left-1/2 -translate-x-1/2",
+          "pointer-events-none absolute -bottom-[7px] left-3",
           "w-3.5 h-3.5 rotate-45",
-          tailBg,
-          tailBorder,
-          "border-l border-t",
+          palette.replace("border", "tail").split(" ")[0], // noop, só para manter array
         ].join(" ")}
+        style={{
+          background: undefined,
+          borderLeft: undefined,
+          borderTop: undefined,
+        }}
       />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-[7px] left-3 w-3.5 h-3.5 rotate-45"
+        style={{
+          backgroundColor:
+            state === "hot" ? "rgb(255 237 213)" : state === "cool" ? "rgb(224 242 254)" : "white",
+          borderLeft:
+            state === "hot"
+              ? "1px solid rgb(254 215 170)"
+              : state === "cool"
+              ? "1px solid rgb(186 230 253)"
+              : "1px solid rgb(226 232 240)",
+          borderTop:
+            state === "hot"
+              ? "1px solid rgb(254 215 170)"
+              : state === "cool"
+              ? "1px solid rgb(186 230 253)"
+              : "1px solid rgb(226 232 240)",
+        }}
+      />
+
       <div className="flex items-center justify-between gap-1">
         <span
           className={[
