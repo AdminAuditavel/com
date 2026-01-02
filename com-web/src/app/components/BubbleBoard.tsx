@@ -112,9 +112,9 @@ function WaveBars({ id, state, energy }: { id: string; state: Bubble["state"]; e
 
   const barCls = state === "hot" ? "bg-orange-400" : state === "cool" ? "bg-sky-400" : "bg-slate-400";
   const dur = state === "hot" ? 1400 : state === "cool" ? 1700 : 2200;
-  const amp = state === "hot" ? 0.16 : state === "cool" ? 0.10 : 0.06;
+  const amp = state === "hot" ? 0.16 : state === "cool" ? 0.1 : 0.06;
 
-  const baseLevel = 0.18 + v * 0.70;
+  const baseLevel = 0.18 + v * 0.7;
   const COUNT = 26;
 
   const rand = makeSeededRand(hash32(id));
@@ -124,9 +124,9 @@ function WaveBars({ id, state, energy }: { id: string; state: Bubble["state"]; e
 
     const ramp =
       state === "hot"
-        ? 0.30 + t * 0.90
+        ? 0.3 + t * 0.9
         : state === "cool"
-        ? 1.20 - t * 0.90
+        ? 1.2 - t * 0.9
         : 0.78 + (rand() * 0.06 - 0.03);
 
     const jitter = rand() * 0.05 - 0.025;
@@ -164,7 +164,9 @@ function WaveBars({ id, state, energy }: { id: string; state: Bubble["state"]; e
             Evidência:{" "}
             <span className="font-semibold text-slate-900">{v >= 0.72 ? "Alta" : v >= 0.45 ? "Média" : "Baixa"}</span>
           </span>
-          <span className="text-slate-500">{state === "hot" ? "ganhando força" : state === "cool" ? "perdendo força" : "estável"}</span>
+          <span className="text-slate-500">
+            {state === "hot" ? "ganhando força" : state === "cool" ? "perdendo força" : "estável"}
+          </span>
         </div>
       </div>
 
@@ -239,7 +241,7 @@ export default function BubbleBoard() {
         prev.map((cat) => ({
           ...cat,
           items: cat.items.map((b) => {
-            if (hotIds.has(b.id)) return { ...b, state: "hot", energy: clamp01(b.energy + 0.010) };
+            if (hotIds.has(b.id)) return { ...b, state: "hot", energy: clamp01(b.energy + 0.01) };
             if (coolIds.has(b.id)) return { ...b, state: "cool", energy: clamp01(b.energy - 0.008) };
             const baseline = 0.5;
             return { ...b, state: "steady", energy: clamp01(b.energy + (baseline - b.energy) * 0.02) };
@@ -317,7 +319,6 @@ export default function BubbleBoard() {
     });
     ro.observe(el);
 
-    // set inicial
     const h0 = el.getBoundingClientRect().height;
     if (h0 > 0) setStickyH(h0);
 
@@ -328,10 +329,10 @@ export default function BubbleBoard() {
     const sc = listRef.current;
     if (!sc) return;
 
-    // a “linha” logo abaixo do sticky dentro do scroll container
-    const targetY = sc.scrollTop + stickyH + 16;
+    const { scrollTop, scrollHeight, clientHeight } = sc;
+    const targetY = scrollTop + stickyH + 16;
+    const nearBottom = scrollTop + clientHeight >= scrollHeight - 24; // tolerância para final da lista
 
-    // escolhe o card cujo topo está mais próximo (>= targetY - tolerância)
     const TOL = 10;
 
     let bestId: string | null = null;
@@ -344,16 +345,14 @@ export default function BubbleBoard() {
       const top = el.offsetTop; // relativo ao scroll container
       const delta = top - targetY;
 
-      // queremos o primeiro que “assume” abaixo do sticky:
-      // delta >= -TOL (permite pequena sobreposição)
       if (delta >= -TOL && delta < bestDelta) {
         bestDelta = delta;
         bestId = item.id;
       }
     }
 
-    // se chegamos no final e não há ninguém “abaixo” da linha, o featured vira o último
-    if (!bestId && flatList.length > 0) {
+    // Se estamos no fim ou não achou candidato, força o último como featured
+    if ((!bestId || nearBottom) && flatList.length > 0) {
       bestId = flatList[flatList.length - 1].id;
     }
 
@@ -379,6 +378,23 @@ export default function BubbleBoard() {
 
   const featured = featuredId ? byId.get(featuredId) ?? null : null;
 
+  // helper para abrir modal garantindo visibilidade
+  const openTopic = useCallback((b: Bubble & { category: string }) => {
+    // sobe o container para não empurrar o modal para baixo
+    listRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    setSelected(asDetail(b));
+  }, []);
+
+  // bloqueia scroll do body enquanto modal aberto (melhora UX)
+  useEffect(() => {
+    if (!selected) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [selected]);
+
   // ===== UI helpers =====
   const cardChrome = (b: Bubble) => {
     const accent = stateAccent(b.state);
@@ -396,12 +412,8 @@ export default function BubbleBoard() {
 
     return (
       <div
-        className={[
-          cardChrome(b),
-          "shadow-md ring-2 ring-orange-200",
-          "py-7 px-5",
-        ].join(" ")}
-        onClick={() => setSelected(asDetail(b))}
+        className={[cardChrome(b), "shadow-md ring-2 ring-orange-200", "py-7 px-5"].join(" ")}
+        onClick={() => openTopic(b)}
       >
         <div className="flex items-center justify-between gap-2">
           <span
@@ -471,12 +483,8 @@ export default function BubbleBoard() {
         ref={(el) => {
           cardElsRef.current[b.id] = el;
         }}
-        className={[
-          cardChrome(b),
-          idx === 0 ? "py-5 px-4" : "py-3 px-3",
-          "hover:shadow-md active:translate-y-[1px]",
-        ].join(" ")}
-        onClick={() => setSelected(asDetail(b))}
+        className={[cardChrome(b), idx === 0 ? "py-5 px-4" : "py-3 px-3", "hover:shadow-md active:translate-y-[1px]"].join(" ")}
+        onClick={() => openTopic(b)}
       >
         <div className="flex items-center justify-between gap-2">
           <span
@@ -528,7 +536,7 @@ export default function BubbleBoard() {
   };
 
   // (valor usado só para “folga” adicional)
-  const spacerH = Math.max(200, stickyH + 16);
+  const spacerH = Math.max(280, stickyH + 160);
 
   return (
     <>
