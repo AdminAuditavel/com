@@ -73,20 +73,27 @@ function MiniChart({
   const pct = boostedPercent(points, 2.4);
   const arrow = direction === "up" ? "↑" : "↓";
 
-  const cardW = 150;
-  const cardH = 42;
-  const cardX = width - pad - cardW;
+  // posição do label (direita)
+  const labelX = width - pad - 150;
+  let labelY = endY - 10;
 
-  let cardY = endY - cardH / 2;
   const axisH = showXAxis ? 14 : 0;
-  const minY = pad;
-  const maxY = height - pad - axisH - cardH;
-  cardY = Math.max(minY, Math.min(maxY, cardY));
+  const minY = pad + 14;
+  const maxY = height - pad - axisH - 12;
+  labelY = Math.max(minY, Math.min(maxY, labelY));
 
   const t15 = new Date(now.getTime() - 15 * 60 * 1000);
   const t10 = new Date(now.getTime() - 10 * 60 * 1000);
   const t5 = new Date(now.getTime() - 5 * 60 * 1000);
   const t0 = now;
+
+  // “stroke” branco por trás do texto, pra ficar legível sem retângulo
+  const outline = {
+    paintOrder: "stroke" as const,
+    stroke: "rgba(255,255,255,0.92)",
+    strokeWidth: 4,
+    strokeLinejoin: "round" as const,
+  };
 
   return (
     <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
@@ -100,12 +107,12 @@ function MiniChart({
       <path d={path} fill="none" stroke={color} strokeWidth="2.4" />
       <circle cx={endX} cy={endY} r="3.8" fill={color} />
 
-      <g transform={`translate(${cardX}, ${cardY})`}>
-        <rect x={0} y={0} width={cardW} height={cardH} rx={12} fill="rgba(255,255,255,0.80)" />
-        <text x={12} y={17} fontSize="11" fill="#374151">
+      {/* LABEL sem retângulo (só texto com contorno) */}
+      <g transform={`translate(${labelX}, ${labelY})`}>
+        <text x={0} y={0} fontSize="11" fill="#374151" style={outline}>
           {name}
         </text>
-        <text x={12} y={36} fontSize="14" fill={color} fontWeight={800}>
+        <text x={0} y={18} fontSize="14" fill={color} fontWeight={800} style={outline}>
           {arrow}
           {pct}%
         </text>
@@ -113,16 +120,16 @@ function MiniChart({
 
       {showXAxis && (
         <g fill="#6b7280" fontSize="10">
-          <text x={xAt(0, width, pad)} y={height - 2}>
+          <text x={xAt(0, width, pad)} y={height - 2} style={outline}>
             {fmtTime(t15)}
           </text>
-          <text x={xAt(5, width, pad) - 10} y={height - 2}>
+          <text x={xAt(5, width, pad) - 10} y={height - 2} style={outline}>
             {fmtTime(t10)}
           </text>
-          <text x={xAt(10, width, pad) - 10} y={height - 2}>
+          <text x={xAt(10, width, pad) - 10} y={height - 2} style={outline}>
             {fmtTime(t5)}
           </text>
-          <text x={xAt(15, width, pad) - 22} y={height - 2}>
+          <text x={xAt(15, width, pad) - 22} y={height - 2} style={outline}>
             {fmtTime(t0)}
           </text>
         </g>
@@ -138,7 +145,7 @@ export default function TrendChartsStack({
   width = 360,
   hotHeight = 130,
   coolHeight = 145,
-  overlapPx = 80,
+  overlapPx = 50,
 }: {
   hot: { name: string; points: Point[] };
   cool: { name: string; points: Point[] };
