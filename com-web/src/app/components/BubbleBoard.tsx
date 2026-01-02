@@ -180,6 +180,26 @@ function stepEnergy(prevEnergy: number, state: Bubble["state"]) {
   return clamp01(e + (baseline - e) * 0.03);
 }
 
+function getEditorialBadge(b: Bubble) {
+  const score = b.evidence_score ?? 0;
+
+  if (b.state === "hot" && score >= 78) {
+    return {
+      text: "Em alta agora",
+      cls: "bg-orange-500 text-white border-orange-500/40",
+    };
+  }
+
+  if (b.state === "cool" && score <= 22) {
+    return {
+      text: "Perdendo fôlego",
+      cls: "bg-sky-500 text-white border-sky-500/40",
+    };
+  }
+
+  return null;
+}
+
 function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
 }
@@ -528,6 +548,8 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
 
   const renderFeaturedCard = (b: Bubble & { category: string }) => {
     const likedState = liked[b.id];
+    const badge = getEditorialBadge(b);
+    
     return (
       <div className={[cardChrome(b), "p-6"].join(" ")} onClick={() => openTopic(b)}>
         <div className="flex items-center justify-between gap-2">
@@ -554,6 +576,20 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
           <div className="min-w-0 flex-1">
             <p className="text-[26px] md:text-[30px] font-semibold text-slate-900 leading-tight">{b.label}</p>
             <p className="text-[13px] text-slate-600">Toque para ver detalhes</p>
+           {badge && (
+            <div className="mt-2">
+              <span
+                className={[
+                  "inline-flex items-center rounded-full border px-3 py-1",
+                  "text-[12px] font-semibold tracking-tight",
+                  "shadow-sm",
+                  badge.cls,
+                ].join(" ")}
+              >
+                {badge.text}
+              </span>
+            </div>
+          )} 
           </div>
           <TrendInline spark={b.spark ?? 0} state={b.state} />
         </div>
