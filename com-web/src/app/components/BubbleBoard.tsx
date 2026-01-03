@@ -10,8 +10,18 @@ type Bubble = {
   state: "hot" | "steady" | "cool";
   size: "lg" | "md" | "sm";
   energy: number; // 0..1
-  spark?: number; // trend % (aqui passará a ser recent_growth)
-  evidence_score?: number; // novo
+  /**
+   * Recent growth (-0.22..+0.28). Usado no UI como "trend" (%).
+   * OBS: mantemos o nome `spark` por compatibilidade com o resto do componente.
+   */
+  spark?: number;
+  /**
+   * Score sintético (0..100) que combina:
+   * - recent growth (spark)
+   * - energy
+   * - leve ajuste por estado (hot/cool)
+   */
+  evidence_score?: number;
 };
 
 type CategoryBlock = {
@@ -22,8 +32,8 @@ type CategoryBlock = {
 type BubbleBoardProps = {
   search?: string;
   /**
-   * Offset do sticky featured para não ficar por baixo do header do Home.
-   * Ajuste fino se precisar.
+   * Offset do sticky "featured" para não ficar por baixo do header do Home.
+   * Se mudar a altura do header (título/busca), ajuste esse valor.
    */
   headerOffsetPx?: number;
 };
@@ -53,10 +63,12 @@ const INITIAL_DATA: CategoryBlock[] = [
   },
 ];
 
+/** Clamp para 0..1 (uso geral: energy). */
 function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }
 
+/** Clamp genérico. */
 function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
 }
@@ -116,7 +128,11 @@ function TrendInline({ spark, state }: { spark?: number; state: Bubble["state"] 
   );
 }
 
-// deterministic pseudo-random
+/**
+ * RNG determinístico (barato) para:
+ * - gerar barras (WaveBars)
+ * - simular growth por tópico (sem depender de backend)
+ */
 function hash32(str: string) {
   let h = 0;
   for (let i = 0; i < str.length; i++) h = (h << 5) - h + str.charCodeAt(i);
@@ -130,14 +146,23 @@ function makeSeededRand(seed: number) {
   };
 }
 
-/* ======================================================
-   LÓGICA DE PRODUTO (MOTOR DE EVIDÊNCIA)
-====================================================== */
+/* =====================================================================================
+   "Motor de evidência" (simulação local)
+   Objetivo: gerar sinais estáveis e críveis sem backend.
+   - spark: crescimento recente (recent growth) por tópico
+   - state: derivado do spark com histerese (evita flicker)
+   - energy: massa/inércia (0..1), ajusta mais devagar que spark
+   - evidence_score: score único 0..100 para ordenar
+===================================================================================== */
 
+/**
+ * Deriva o estado (hot/cool/steady) do growth usando histerese:
+ * - thresholds de entrada e saída diferentes (evita trocar de estado a cada tick).
+ */
 function toStateFromGrowth(g: number, prev?: Bubble["state"]): Bubble["state"] {
   const HOT_IN = 0.12;
   const HOT_OUT = 0.06;
-  const COOL_IN = -0.10;
+  const COOL_IN = -0.1;
   const COOL_OUT = -0.05;
 
   if (prev === "hot") return g >= HOT_OUT ? "hot" : "steady";
@@ -148,42 +173,54 @@ function toStateFromGrowth(g: number, prev?: Bubble["state"]): Bubble["state"] {
   return "steady";
 }
 
-// crescimento recente (-0.22..+0.28) determinístico por tópico e tick
+/**
+ * Simula recent growth (-0.22..+0.28) de forma determinística por tópico e tick.
+ * (sinus + base + "choque" raro)
+ */
 function simulateGrowthDet(topicId: string, tick: number) {
   const rand = makeSeededRand(hash32(topicId));
 
-  const base = rand() * 0.20 - 0.10; // -0.10..+0.10
+  const base = rand() * 0.2 - 0.1; // -0.10..+0.10
   const freq = 0.08 + rand() * 0.06; // 0.08..0.14
   const phase = rand() * Math.PI * 2;
 
-  const wave = Math.sin(tick * freq + phase) * (0.06 + rand() * 0.05); // amplitude 0.06..0.11
+  const wave = Math.sin(tick * freq + phase) * (0.06 + rand() * 0.05); // amp 0.06..0.11
   const shock = Math.sin(tick * 0.015 + phase * 0.7) > 0.92 ? 0.06 + rand() * 0.05 : 0;
 
   return clamp(base + wave + shock, -0.22, 0.28);
 }
 
+/**
+ * Atualiza energy com inércia:
+ * - hot tende a subir
+ * - cool tende a cair
+ * - steady converge para baseline (0.5)
+ */
 function stepEnergy(prevEnergy: number, state: Bubble["state"]) {
   const baseline = 0.5;
   const e = clamp01(prevEnergy);
 
-  if (state === "hot") return clamp01(e + 0.010 + (baseline - e) * 0.01);
-  if (state === "cool") return clamp01(e - 0.010 + (baseline - e) * 0.01);
+  if (state === "hot") return clamp01(e + 0.01 + (baseline - e) * 0.01);
+  if (state === "cool") return clamp01(e - 0.01 + (baseline - e) * 0.01);
 
   return clamp01(e + (baseline - e) * 0.03);
 }
 
 /**
  * evidence_score (0..100)
- * - growth (spark) pesa mais
- * - energy pesa bastante
- * - bônus editorial para hot/cool
+ * Intuição:
+ * - spark (agora) pesa mais
+ * - energy (massa) complementa
+ * - leve ajuste por estado (hot/cool)
  */
 function computeEvidenceScore(energy: number, growth: number, state: Bubble["state"]) {
   const e = clamp(energy, 0, 1);
   const g = clamp(growth, -0.25, 0.25);
 
-  const g01 = (g + 0.25) / 0.5; // -0.25 -> 0 ; +0.25 -> 1
-  let score = (g01 * 0.60 + e * 0.40) * 100;
+  // normaliza growth para 0..1 em torno de 0
+  const g01 = (g + 0.25) / 0.5;
+
+  let score = (g01 * 0.6 + e * 0.4) * 100;
 
   if (state === "hot") score += 6;
   if (state === "cool") score -= 4;
@@ -191,24 +228,89 @@ function computeEvidenceScore(energy: number, growth: number, state: Bubble["sta
   return clamp(score, 0, 100);
 }
 
+/**
+ * Badge editorial (mais "app") para extremos de evidência.
+ * Caso não exista, a UI mostra o "pill técnico" do estado.
+ */
 function getEditorialBadge(b: Bubble) {
   const score = b.evidence_score ?? 0;
 
   if (b.state === "hot" && score >= 78) {
-    return {
-      text: "Em alta agora",
-      cls: "bg-orange-500 text-white border-orange-500/40",
-    };
+    return { text: "Em alta agora", cls: "bg-orange-500 text-white border-orange-500/40" };
   }
 
   if (b.state === "cool" && score <= 22) {
-    return {
-      text: "Perdendo fôlego",
-      cls: "bg-sky-500 text-white border-sky-500/40",
-    };
+    return { text: "Perdendo fôlego", cls: "bg-sky-500 text-white border-sky-500/40" };
   }
 
   return null;
+}
+
+/**
+ * Mini equalizer para cards pequenos (canto inferior direito).
+ * Serve como um "sinal" visual rápido do estado, sem poluir o layout.
+ */
+function MiniBars({ id, state, energy }: { id: string; state: Bubble["state"]; energy: number }) {
+  const v = clamp01(energy);
+
+  const barCls =
+    state === "hot" ? "bg-orange-400/80" : state === "cool" ? "bg-sky-400/80" : "bg-slate-400/70";
+
+  const rand = makeSeededRand(hash32("mini-" + id));
+
+  const bars = Array.from({ length: 4 }, (_, i) => {
+    const base =
+      state === "hot" ? 0.35 + v * 0.55 : state === "cool" ? 0.25 + v * 0.35 : 0.3 + v * 0.25;
+
+    const jitter = rand() * 0.18 - 0.09;
+    const h = clamp01(base + jitter);
+
+    const dur = state === "hot" ? 900 : state === "cool" ? 1100 : 1400;
+    const delay = i * 90;
+
+    return { h, dur, delay };
+  });
+
+  return (
+    <div className="pointer-events-none absolute bottom-3 right-3 flex items-end gap-1 opacity-70">
+      {bars.map((b, idx) => (
+        <div
+          key={idx}
+          className={["w-1 rounded-full", barCls, "minibar"].join(" ")}
+          style={
+            {
+              height: `${Math.round(b.h * 18) + 6}px`, // 6..24px
+              animationDuration: `${b.dur}ms`,
+              animationDelay: `${b.delay}ms`,
+            } as React.CSSProperties
+          }
+        />
+      ))}
+
+      <style jsx>{`
+        .minibar {
+          transform-origin: bottom;
+          animation-name: miniPulse;
+          animation-timing-function: ease-in-out;
+          animation-iteration-count: infinite;
+        }
+        @keyframes miniPulse {
+          0% {
+            transform: scaleY(0.75);
+            opacity: 0.65;
+          }
+          50% {
+            transform: scaleY(1.12);
+            opacity: 0.9;
+          }
+          100% {
+            transform: scaleY(0.78);
+            opacity: 0.7;
+          }
+        }
+      `}</style>
+    </div>
+  );
 }
 
 function WaveBars({ id, state, energy }: { id: string; state: Bubble["state"]; energy: number }) {
@@ -313,7 +415,8 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
   const CHANGE_MS = 10_000;
   const [tick, setTick] = useState(0);
 
-  // mantém ordem estável; ainda útil para determinismo de tick
+  // Ordem estável (não muda com filtros). Útil para manter consistência visual.
+  // OBS: pode ser removido se você não for mais usar isso para nada.
   const orderRef = useRef(
     INITIAL_DATA.map((cat) => ({
       title: cat.title,
@@ -326,12 +429,7 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
     return () => window.clearInterval(t);
   }, []);
 
-  /* ======================================================
-     ATUALIZAÇÃO — MOTOR DE EVIDÊNCIA
-     - spark = recent_growth
-     - state = função do growth
-     - energy = inércia por state
-  ====================================================== */
+  // Loop de simulação (UI "viva"): atualiza spark/state/energy/evidence_score.
   useEffect(() => {
     const STEP_MS = 160;
 
@@ -341,14 +439,14 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
           ...cat,
           items: cat.items.map((b) => {
             const g = simulateGrowthDet(b.id, tick);
-            const state = toStateFromGrowth(g, b.state);
-            const nextEnergy = stepEnergy(b.energy, state);
-            const score = computeEvidenceScore(nextEnergy, g, state);
+            const nextState = toStateFromGrowth(g, b.state);
+            const nextEnergy = stepEnergy(b.energy, nextState);
+            const score = computeEvidenceScore(nextEnergy, g, nextState);
 
             return {
               ...b,
               spark: g,
-              state,
+              state: nextState,
               energy: nextEnergy,
               evidence_score: score,
             };
@@ -383,7 +481,8 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
       else steady.push(b);
     });
 
-    const byEvidenceDesc = (arr: typeof hot) => arr.sort((a, b) => (b.evidence_score ?? 0) - (a.evidence_score ?? 0));
+    const byEvidenceDesc = (arr: typeof hot) =>
+      arr.sort((a, b) => (b.evidence_score ?? 0) - (a.evidence_score ?? 0));
 
     return {
       hot: byEvidenceDesc(hot),
@@ -406,7 +505,7 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
     return m;
   }, [flatList]);
 
-  // ===== Sticky featured =====
+  // ===== Sticky featured (o card fixo que acompanha o scroll) =====
   const [featuredId, setFeaturedId] = useState<string | null>(null);
 
   const stickyRef = useRef<HTMLDivElement | null>(null);
@@ -421,6 +520,7 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
     if (!stickyRef.current) return;
 
     const stickyRect = stickyRef.current.getBoundingClientRect();
+    // "linha alvo" logo abaixo do sticky
     const targetY = stickyRect.bottom + 2;
 
     let bestId: string | null = null;
@@ -593,7 +693,7 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
         ref={(el) => {
           cardElsRef.current[b.id] = el;
         }}
-        className={[cardChrome(b), "p-4"].join(" ")}
+        className={[cardChrome(b), "p-4 relative overflow-hidden"].join(" ")}
         onClick={() => openTopic(b)}
       >
         <div className="flex items-center justify-between gap-2">
@@ -624,6 +724,9 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
           <p className="text-[16px] font-semibold text-slate-900 leading-tight">{b.label}</p>
           <p className="text-[13px] text-slate-500">Toque para ver detalhes</p>
         </div>
+
+        {/* Mini equalizer no canto inferior direito */}
+        <MiniBars id={b.id} state={b.state} energy={b.energy} />
       </div>
     );
   };
