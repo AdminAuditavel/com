@@ -247,68 +247,38 @@ function getEditorialBadge(b: Bubble) {
 }
 
 /**
- * Mini equalizer para cards pequenos (canto inferior direito).
- * Serve como um "sinal" visual rápido do estado, sem poluir o layout.
+ * Indicador estático (sem animação) de 5 barras no canto inferior direito dos cards pequenos.
+ * - hot: barras ascendentes
+ * - cool: barras descendentes
+ * - steady: barras quase niveladas
+ *
+ * A altura geral é modulada por energy (0..1), mas mantém o "shape" do estado.
  */
-function MiniBars({ id, state, energy }: { id: string; state: Bubble["state"]; energy: number }) {
+function MiniBarsStatic({ state, energy }: { state: Bubble["state"]; energy: number }) {
   const v = clamp01(energy);
 
   const barCls =
     state === "hot" ? "bg-orange-400/80" : state === "cool" ? "bg-sky-400/80" : "bg-slate-400/70";
 
-  const rand = makeSeededRand(hash32("mini-" + id));
+  // Shapes base (0..1)
+  const shape =
+    state === "hot"
+      ? [0.25, 0.42, 0.58, 0.74, 0.9]
+      : state === "cool"
+      ? [0.9, 0.74, 0.58, 0.42, 0.25]
+      : [0.55, 0.52, 0.5, 0.52, 0.55];
 
-  const bars = Array.from({ length: 4 }, (_, i) => {
-    const base =
-      state === "hot" ? 0.35 + v * 0.55 : state === "cool" ? 0.25 + v * 0.35 : 0.3 + v * 0.25;
-
-    const jitter = rand() * 0.18 - 0.09;
-    const h = clamp01(base + jitter);
-
-    const dur = state === "hot" ? 900 : state === "cool" ? 1100 : 1400;
-    const delay = i * 90;
-
-    return { h, dur, delay };
-  });
+  // amplitude por energy (mantém elegante)
+  const basePx = 6; // mínimo
+  const maxPx = 18; // máximo adicional
+  const scale = 0.55 + v * 0.45; // 0.55..1.0
 
   return (
-    <div className="pointer-events-none absolute bottom-3 right-3 flex items-end gap-1 opacity-70">
-      {bars.map((b, idx) => (
-        <div
-          key={idx}
-          className={["w-1 rounded-full", barCls, "minibar"].join(" ")}
-          style={
-            {
-              height: `${Math.round(b.h * 18) + 6}px`, // 6..24px
-              animationDuration: `${b.dur}ms`,
-              animationDelay: `${b.delay}ms`,
-            } as React.CSSProperties
-          }
-        />
-      ))}
-
-      <style jsx>{`
-        .minibar {
-          transform-origin: bottom;
-          animation-name: miniPulse;
-          animation-timing-function: ease-in-out;
-          animation-iteration-count: infinite;
-        }
-        @keyframes miniPulse {
-          0% {
-            transform: scaleY(0.75);
-            opacity: 0.65;
-          }
-          50% {
-            transform: scaleY(1.12);
-            opacity: 0.9;
-          }
-          100% {
-            transform: scaleY(0.78);
-            opacity: 0.7;
-          }
-        }
-      `}</style>
+    <div className="flex items-end gap-1 opacity-70">
+      {shape.map((s, idx) => {
+        const h = Math.round(basePx + maxPx * s * scale); // ~6..24px
+        return <div key={idx} className={["w-1 rounded-full", barCls].join(" ")} style={{ height: h }} />;
+      })}
     </div>
   );
 }
@@ -725,8 +695,10 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
           <p className="text-[13px] text-slate-500">Toque para ver detalhes</p>
         </div>
 
-        {/* Mini equalizer no canto inferior direito */}
-        <MiniBars id={b.id} state={b.state} energy={b.energy} />
+        {/* Mesmo alinhamento do toggle, porém no canto inferior direito */}
+        <div className="absolute bottom-3 right-3">
+          <MiniBarsStatic state={b.state} energy={b.energy} />
+        </div>
       </div>
     );
   };
