@@ -11,7 +11,10 @@ export default function Home() {
       <header className="sticky top-0 z-40 bg-slate-50/80 backdrop-blur-xl border-b border-slate-200/60">
         <div className="mx-auto w-full max-w-3xl px-4 pt-5 pb-4">
           {/* Título maior */}
-          <h1 className="text-center text-[22px] md:text-[26px] font-semibold tracking-tight text-slate-900">
+          <h1
+            className="text-center text-[22px] md:text-[26px] font-semibold tracking-tight"
+            style={{ color: "#1c8080" }}
+          >
             O que está explodindo agora
           </h1>
 
