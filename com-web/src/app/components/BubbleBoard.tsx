@@ -696,7 +696,7 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
         </div>
 
         {/* Mesmo alinhamento do toggle, porém no canto inferior direito */}
-        <div className="absolute bottom-3 right-3">
+        <div className="absolute bottom-3 right-6">
           <MiniBarsStatic state={b.state} energy={b.energy} />
         </div>
       </div>
