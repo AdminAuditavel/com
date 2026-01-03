@@ -90,6 +90,38 @@ function formatDeltaPct(v?: number) {
   return `${pct}%`;
 }
 
+function formatHHMM(d: Date) {
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+/**
+ * Retorna 4 horários cobrindo ~15 min:
+ * - now
+ * - now-5
+ * - now-10
+ * - now-15
+ *
+ * Ex: agora 21:57 -> [21:42, 21:47, 21:52, 21:57]
+ */
+function getLast15MinTicks(now: Date) {
+  const t3 = new Date(now);
+  t3.setSeconds(0);
+  t3.setMilliseconds(0);
+
+  const t2 = new Date(t3);
+  t2.setMinutes(t2.getMinutes() - 5);
+
+  const t1 = new Date(t3);
+  t1.setMinutes(t1.getMinutes() - 10);
+
+  const t0 = new Date(t3);
+  t0.setMinutes(t0.getMinutes() - 15);
+
+  return [t0, t1, t2, t3];
+}
+
 function TrendInline({ spark, state }: { spark?: number; state: Bubble["state"] }) {
   const pct = formatDeltaPct(spark);
   const icon =
@@ -148,17 +180,8 @@ function makeSeededRand(seed: number) {
 
 /* =====================================================================================
    "Motor de evidência" (simulação local)
-   Objetivo: gerar sinais estáveis e críveis sem backend.
-   - spark: crescimento recente (recent growth) por tópico
-   - state: derivado do spark com histerese (evita flicker)
-   - energy: massa/inércia (0..1), ajusta mais devagar que spark
-   - evidence_score: score único 0..100 para ordenar
 ===================================================================================== */
 
-/**
- * Deriva o estado (hot/cool/steady) do growth usando histerese:
- * - thresholds de entrada e saída diferentes (evita trocar de estado a cada tick).
- */
 function toStateFromGrowth(g: number, prev?: Bubble["state"]): Bubble["state"] {
   const HOT_IN = 0.12;
   const HOT_OUT = 0.06;
@@ -173,10 +196,6 @@ function toStateFromGrowth(g: number, prev?: Bubble["state"]): Bubble["state"] {
   return "steady";
 }
 
-/**
- * Simula recent growth (-0.22..+0.28) de forma determinística por tópico e tick.
- * (sinus + base + "choque" raro)
- */
 function simulateGrowthDet(topicId: string, tick: number) {
   const rand = makeSeededRand(hash32(topicId));
 
@@ -190,12 +209,6 @@ function simulateGrowthDet(topicId: string, tick: number) {
   return clamp(base + wave + shock, -0.22, 0.28);
 }
 
-/**
- * Atualiza energy com inércia:
- * - hot tende a subir
- * - cool tende a cair
- * - steady converge para baseline (0.5)
- */
 function stepEnergy(prevEnergy: number, state: Bubble["state"]) {
   const baseline = 0.5;
   const e = clamp01(prevEnergy);
@@ -206,20 +219,11 @@ function stepEnergy(prevEnergy: number, state: Bubble["state"]) {
   return clamp01(e + (baseline - e) * 0.03);
 }
 
-/**
- * evidence_score (0..100)
- * Intuição:
- * - spark (agora) pesa mais
- * - energy (massa) complementa
- * - leve ajuste por estado (hot/cool)
- */
 function computeEvidenceScore(energy: number, growth: number, state: Bubble["state"]) {
   const e = clamp(energy, 0, 1);
   const g = clamp(growth, -0.25, 0.25);
 
-  // normaliza growth para 0..1 em torno de 0
   const g01 = (g + 0.25) / 0.5;
-
   let score = (g01 * 0.6 + e * 0.4) * 100;
 
   if (state === "hot") score += 6;
@@ -228,10 +232,6 @@ function computeEvidenceScore(energy: number, growth: number, state: Bubble["sta
   return clamp(score, 0, 100);
 }
 
-/**
- * Badge editorial (mais "app") para extremos de evidência.
- * Caso não exista, a UI mostra o "pill técnico" do estado.
- */
 function getEditorialBadge(b: Bubble) {
   const score = b.evidence_score ?? 0;
 
@@ -246,21 +246,12 @@ function getEditorialBadge(b: Bubble) {
   return null;
 }
 
-/**
- * Indicador estático (sem animação) de 5 barras no canto inferior direito dos cards pequenos.
- * - hot: barras ascendentes
- * - cool: barras descendentes
- * - steady: barras quase niveladas
- *
- * A altura geral é modulada por energy (0..1), mas mantém o "shape" do estado.
- */
 function MiniBarsStatic({ state, energy }: { state: Bubble["state"]; energy: number }) {
   const v = clamp01(energy);
 
   const barCls =
     state === "hot" ? "bg-orange-400/80" : state === "cool" ? "bg-sky-400/80" : "bg-slate-400/70";
 
-  // Shapes base (0..1)
   const shape =
     state === "hot"
       ? [0.25, 0.42, 0.58, 0.74, 0.9]
@@ -268,15 +259,14 @@ function MiniBarsStatic({ state, energy }: { state: Bubble["state"]; energy: num
       ? [0.9, 0.74, 0.58, 0.42, 0.25]
       : [0.55, 0.52, 0.5, 0.52, 0.55];
 
-  // amplitude por energy (mantém elegante)
-  const basePx = 6; // mínimo
-  const maxPx = 18; // máximo adicional
-  const scale = 0.55 + v * 0.45; // 0.55..1.0
+  const basePx = 6;
+  const maxPx = 18;
+  const scale = 0.55 + v * 0.45;
 
   return (
     <div className="flex items-end gap-1 opacity-70">
       {shape.map((s, idx) => {
-        const h = Math.round(basePx + maxPx * s * scale); // ~6..24px
+        const h = Math.round(basePx + maxPx * s * scale);
         return <div key={idx} className={["w-1 rounded-full", barCls].join(" ")} style={{ height: h }} />;
       })}
     </div>
@@ -385,8 +375,7 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
   const CHANGE_MS = 10_000;
   const [tick, setTick] = useState(0);
 
-  // Ordem estável (não muda com filtros). Útil para manter consistência visual.
-  // OBS: pode ser removido se você não for mais usar isso para nada.
+  // Mantido por compatibilidade/estabilidade visual (não está sendo usado ativamente).
   const orderRef = useRef(
     INITIAL_DATA.map((cat) => ({
       title: cat.title,
@@ -399,7 +388,14 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
     return () => window.clearInterval(t);
   }, []);
 
-  // Loop de simulação (UI "viva"): atualiza spark/state/energy/evidence_score.
+  // Re-render periódico para atualizar a régua de horas do "últimos 15 min".
+  // (1x por segundo é overkill; 5s é suficiente e já acompanha o "minuto atual" bem.)
+  const [nowTick, setNowTick] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => setNowTick((x) => x + 1), 5_000);
+    return () => window.clearInterval(t);
+  }, []);
+
   useEffect(() => {
     const STEP_MS = 160;
 
@@ -475,7 +471,7 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
     return m;
   }, [flatList]);
 
-  // ===== Sticky featured (o card fixo que acompanha o scroll) =====
+  // ===== Sticky featured =====
   const [featuredId, setFeaturedId] = useState<string | null>(null);
 
   const stickyRef = useRef<HTMLDivElement | null>(null);
@@ -490,7 +486,6 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
     if (!stickyRef.current) return;
 
     const stickyRect = stickyRef.current.getBoundingClientRect();
-    // "linha alvo" logo abaixo do sticky
     const targetY = stickyRect.bottom + 2;
 
     let bestId: string | null = null;
@@ -607,6 +602,10 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
     const likedState = liked[b.id];
     const badge = getEditorialBadge(b);
 
+    // força re-render quando nowTick muda para atualizar os labels
+    void nowTick;
+    const timeTicks = getLast15MinTicks(new Date()).map(formatHHMM);
+
     return (
       <div className={[cardChrome(b), "p-6"].join(" ")} onClick={() => openTopic(b)}>
         <div className="flex items-center justify-between gap-2">
@@ -647,6 +646,14 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
         <div className="w-full">
           <div className="h-28 md:h-32">
             <WaveBars id={b.id} state={b.state} energy={b.energy} />
+          </div>
+
+          {/* Régua de tempo (últimos 15 min), abaixo do WaveBars */}
+          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+            <span>{timeTicks[0]}</span>
+            <span>{timeTicks[1]}</span>
+            <span>{timeTicks[2]}</span>
+            <span className="font-semibold text-slate-600">{timeTicks[3]}</span>
           </div>
         </div>
       </div>
@@ -695,8 +702,8 @@ export default function BubbleBoard({ search = "", headerOffsetPx = 148 }: Bubbl
           <p className="text-[13px] text-slate-500">Toque para ver detalhes</p>
         </div>
 
-        {/* Mesmo alinhamento do toggle, porém no canto inferior direito */}
-        <div className="absolute bottom-3 right-6">
+        {/* Barrinhas estáticas: canto inferior direito, alinhadas visualmente */}
+        <div className="absolute bottom-3 right-5">
           <MiniBarsStatic state={b.state} energy={b.energy} />
         </div>
       </div>
